@@ -16,8 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls), # (Opcional) Panel de administrador
     path('', include('web.urls')),   # Esto redirige todo lo que entre al dominio raíz hacia tu app "web"
+    path('erp/dashboard/', views.dashboard_erp, name='dashboard_erp'),
+    path('erp/nuevo-ticket/', views.crear_requerimiento, name='crear_requerimiento'),
+    path('erp/ticket/<int:req_id>/materiales/', views.añadir_materiales, name='añadir_materiales'),
+
 ]
