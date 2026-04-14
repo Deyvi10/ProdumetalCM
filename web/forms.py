@@ -1,5 +1,6 @@
 from django import forms
 from .models import Requerimiento, DetalleRequerimiento, MovimientoInventario
+from django.contrib.auth.models import User, Group
 
 class RequerimientoForm(forms.ModelForm):
     class Meta:
@@ -18,3 +19,32 @@ class DetalleRequerimientoForm(forms.ModelForm):
             'material': forms.Select(attrs={'class': 'form-control'}),
             'cantidad_solicitada': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.1', 'step': '0.01'}),
         }
+
+class RegistroEmpleadoForm(forms.ModelForm):
+    # Campo extra para elegir el rol
+    rol = forms.ModelChoiceField(
+        queryset=Group.objects.all(),
+        empty_label="Seleccione un cargo...",
+        widget=forms.Select(attrs={'class': 'form-select', 'required': 'required'})
+    )
+
+    class Meta:
+        model = User
+        fields = ['username', 'first_name', 'last_name', 'email', 'password']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. jperez'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'password': forms.PasswordInput(attrs={'class': 'form-control'}),
+        }
+
+    def save(self, commit=True):
+        # Sobrescribimos el método save para encriptar la contraseña y asignar el rol
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password"]) # Encriptación obligatoria
+        if commit:
+            user.save()
+            rol = self.cleaned_data['rol']
+            user.groups.add(rol) # Se le asigna el rol elegido en el formulario
+        return user

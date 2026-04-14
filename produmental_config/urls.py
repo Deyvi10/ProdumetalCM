@@ -1,28 +1,7 @@
-"""
-URL configuration for produmental_config project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
-from . import views
 
 urlpatterns = [
-    path('admin/', admin.site.urls), # (Opcional) Panel de administrador
-    path('', include('web.urls')),   # Esto redirige todo lo que entre al dominio raíz hacia tu app "web"
-    path('erp/dashboard/', views.dashboard_erp, name='dashboard_erp'),
-    path('erp/nuevo-ticket/', views.crear_requerimiento, name='crear_requerimiento'),
-    path('erp/ticket/<int:req_id>/materiales/', views.añadir_materiales, name='añadir_materiales'),
-
+    path('portal-gerencial-produmetalcm-2026/', admin.site.urls), # Panel de administrador
+    path('', include('web.urls')),   # Delega TODAS las demás rutas a la app 'web'
 ]

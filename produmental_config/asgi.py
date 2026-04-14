@@ -14,3 +14,7 @@ from django.core.asgi import get_asgi_application
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'produmental_config.settings')
 
 application = get_asgi_application()
+
+# Redirecciones de Login y Logout
+LOGIN_REDIRECT_URL = 'dashboard_erp'
+LOGOUT_REDIRECT_URL = 'inicio'

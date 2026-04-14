@@ -1,4 +1,16 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib import messages
+from django.contrib.auth.models import User, Group
+
+# Importaciones de Modelos y Formularios
+from .models import Requerimiento, Material, Proyecto
+from .forms import RequerimientoForm, DetalleRequerimientoForm, RegistroEmpleadoForm
+
+
+# =======================================================
+# VISTAS DE LA PÁGINA WEB PÚBLICA
+# =======================================================
 
 def inicio(request):
     return render(request, 'web/inicio.html')
@@ -13,7 +25,6 @@ def nosotros(request):
 
 def servicios(request):
     lista_servicios = [
-        # NOTA: Debes tener estas fotos en tu carpeta web/static/web/img/
         {'titulo': 'Análisis y Diseño Estructural', 'desc': 'Cálculos precisos y seguridad.', 'img': 'serv_diseno.jpg'},
         {'titulo': 'Fabricación y Montaje', 'desc': 'Construcciones de gran envergadura.', 'img': 'serv_montaje.jpg'},
         {'titulo': 'Planos de Fabricación', 'desc': 'Detalles técnicos para taller.', 'img': 'serv_planos.jpg'},
@@ -28,13 +39,12 @@ def servicios(request):
     ]
     return render(request, 'web/servicios.html', {'servicios': lista_servicios})
 
-# --- NUEVA FUNCIÓN PARA LAS ESPECIALIDADES ---
 def detalle_especialidad(request, tipo):
     datos = {
         'estructuras': {
             'titulo': 'Estructuras Metálicas',
             'desc_larga': 'Nos especializamos en el diseño, fabricación y montaje de estructuras de acero de alta complejidad. Desde naves industriales hasta edificios comerciales, garantizamos resistencia sísmica y durabilidad.',
-            'galeria': ['est1.jpg', 'est2.jpg', 'est3.jpg', 'est4.jpg','est5.jpg','est6.jpg', 'est7.jpg', 'est8.jpg', 'est9.jpg'] # Tus fotos aquí
+            'galeria': ['est1.jpg', 'est2.jpg', 'est3.jpg', 'est4.jpg','est5.jpg','est6.jpg', 'est7.jpg', 'est8.jpg', 'est9.jpg']
         },
         'carpinteria': {
             'titulo': 'Carpintería Metálica',
@@ -48,164 +58,154 @@ def detalle_especialidad(request, tipo):
         }
     }
     
-    # Selecciona la info correcta o devuelve un error 404 si no existe
     info = datos.get(tipo)
     return render(request, 'web/detalle_especialidad.html', {'info': info})
 
 def proyectos(request):
-    # Aquí separamos las dos galerías que pediste
     lista_proyectos = [
-        # ESTRUCTURAS
-        {'titulo': 'Estructura Industrial', 'categoria': 'Estructuras Metálicas', 'img': 'est1.jpg'},
-        {'titulo': 'Montaje de Galpón', 'categoria': 'Estructuras Metálicas', 'img': 'est2.jpg'},
-        # CARPINTERÍA
-        {'titulo': 'Portón Residencial', 'categoria': 'Carpintería Metálica', 'img': 'carp1.jpg'},
-        {'titulo': 'Escalera de Diseño', 'categoria': 'Carpintería Metálica', 'img': 'carp2.jpg'},
-        
-    ]
-    return render(request, 'web/proyectos.html', {'proyectos': lista_proyectos})
-
-def contacto(request):
-    return render(request, 'web/contacto.html')
-
-
-def proyectos(request):
-    # Esta es la lista para la página principal de proyectos (Tarjetas)
-    lista_proyectos = [
-        {
-            'id': 'plaza-kocoa', 
-            'titulo': 'Plaza Kocoa', 
-            'categoria': 'Comercial / Estructuras', 
-            'img': 'kocoa/kocoa_main.jpg'
-        },
-        {
-            'id': 'campo-oh', 
-            'titulo': 'Casa de Campo O&H', 
-            'categoria': 'Residencial / Diseño', 
-            'img': 'oh_main.jpg'
-        },
-        {
-            'id': 'san-isidro', 
-            'titulo': 'Conjunto San Isidro', 
-            'categoria': 'Residencial / Carpintería', 
-            'img': 'isidro_main.jpg'
-        },
-        {
-            'id': 'vaca-lima', 
-            'titulo': 'Residencia Vaca Lima', 
-            'categoria': 'Residencial / Estructura Mixta', 
-            'img': 'vaca_main.jpg'
-        },
-        {
-            'id': 'residencia-art', 
-            'titulo': 'Residencia Arteaga ', 
-            'categoria': 'Residencial / Estructura Mixta', 
-            'img': 'arteaga_main.jpg'
-        }
+        {'id': 'plaza-kocoa', 'titulo': 'Plaza Kocoa', 'categoria': 'Comercial / Estructuras', 'img': 'kocoa/kocoa_main.jpg'},
+        {'id': 'campo-oh', 'titulo': 'Casa de Campo O&H', 'categoria': 'Residencial / Diseño', 'img': 'oh_main.jpg'},
+        {'id': 'san-isidro', 'titulo': 'Conjunto San Isidro', 'categoria': 'Residencial / Carpintería', 'img': 'isidro_main.jpg'},
+        {'id': 'vaca-lima', 'titulo': 'Residencia Vaca Lima', 'categoria': 'Residencial / Estructura Mixta', 'img': 'vaca_main.jpg'},
+        {'id': 'residencia-art', 'titulo': 'Residencia Arteaga ', 'categoria': 'Residencial / Estructura Mixta', 'img': 'arteaga_main.jpg'}
     ]
     return render(request, 'web/proyectos.html', {'proyectos': lista_proyectos})
 
 def detalle_proyecto(request, proyecto_id):
-    # Aquí está toda la información detallada de cada proyecto
     datos_proyectos = {
-        
         'plaza-kocoa': {
             'titulo': 'Plaza Kocoa',
             'ubicacion': 'Conocoto',
-            'descripcion': 'Plaza Kocoa es un moderno proyecto comercial ubicado en Conocoto, diseñado para ofrecer espacios funcionales y una imagen arquitectónica contemporánea. La estructura del proyecto se desarrolla principalmente en acero estructural, permitiendo amplios claros, cubiertas livianas y volúmenes abiertos que realzan la estética del conjunto. Las estructuras metálicas aportan rapidez constructiva, resistencia y versatilidad, integrándose al diseño como un elemento visible y distintivo. Plaza Kocoa se proyecta como un nuevo punto de encuentro comercial, combinando funcionalidad, durabilidad y una imagen moderna.',
-            # Aquí también agregamos la ruta de la carpeta
-            'fotos': [
-                'kocoa/kocoa1.jpg', 
-                'kocoa/kocoa2.jpg', 
-                'kocoa/kocoa3.jpg', 
-                'kocoa/kocoa4.jpg'
-            ],
+            'descripcion': 'Plaza Kocoa es un moderno proyecto comercial ubicado en Conocoto, diseñado para ofrecer espacios funcionales y una imagen arquitectónica contemporánea...',
+            'fotos': ['kocoa/kocoa1.jpg', 'kocoa/kocoa2.jpg', 'kocoa/kocoa3.jpg', 'kocoa/kocoa4.jpg'],
             'videos': ['kocoa/kocoa_vid.mp4']
         },
-        
         'campo-oh': {
             'titulo': 'Casa de Campo O&H',
             'ubicacion': 'Proyecto Residencial',
-            'descripcion': 'Residencia O&H es un proyecto que integra la estructura metálica con principios geométricos, dando lugar a una propuesta arquitectónica moderna y distintiva. Su diseño se compone de 20 pendientes que generan una volumetría dinámica y un estilo único dentro del sector. La combinación entre acero estructural y geometría permite una imagen contemporánea, con líneas definidas y una identidad propia que resalta tanto por su forma como por su sistema constructivo.',
-            'fotos': [
-                'campo/campo1.jpg', 
-                'campo/campo2.jpg',  
-                'campo/campo3.jpg',  
-                'campo/campo4.jpg',
-                'campo/campo5.jpg',
-                'campo/campo6.jpg',
-                'campo/campo7.jpg',
-                'campo/campo8.jpg',
-                'campo/campo9.jpg'
-            ],
+            'descripcion': 'Residencia O&H es un proyecto que integra la estructura metálica con principios geométricos...',
+            'fotos': ['campo/campo1.jpg', 'campo/campo2.jpg', 'campo/campo3.jpg', 'campo/campo4.jpg', 'campo/campo5.jpg', 'campo/campo6.jpg', 'campo/campo7.jpg', 'campo/campo8.jpg', 'campo/campo9.jpg'],
             'videos': ['campo/campo_video1.mp4','campo/campo_video2.mp4']
         },
         'san-isidro': {
             'titulo': 'Conjunto de Casas San Isidro',
             'ubicacion': 'San Isidro',
-            'descripcion': 'Un desarrollo residencial de primer nivel donde la carpintería y estructura metálica de ProduMetal CM aportan seguridad y estética contemporánea. Este proyecto contempla la implementación de cerramientos perimetrales, puertas de acceso automatizadas, pérgolas para áreas comunes y vigas de soporte. La estandarización de los elementos metálicos garantizó una optimización en los tiempos de construcción, asegurando a cada familia una vivienda con acabados impecables, protección anticorrosiva y máxima durabilidad.',
-            'fotos': [
-                'conjunto/isidro1.jpg', 
-                'conjunto/isidro2.jpg', 
-                'conjunto/isidro3.jpg', 
-                'conjunto/isidro4.jpg',
-                'conjunto/isidro5.jpg',
-                'conjunto/isidro6.jpg',
-                'conjunto/isidro7.jpg',
-                'conjunto/isidro8.jpg',
-                'conjunto/isidro9.jpg',
-                'conjunto/isidro10.jpg',
-                'conjunto/isidro11.jpg',
-            ],
-
-            'videos': [] # Si no hay videos, se deja vacío
+            'descripcion': 'Un desarrollo residencial de primer nivel donde la carpintería y estructura metálica de ProduMetal CM aportan seguridad...',
+            'fotos': ['conjunto/isidro1.jpg', 'conjunto/isidro2.jpg', 'conjunto/isidro3.jpg', 'conjunto/isidro4.jpg', 'conjunto/isidro5.jpg', 'conjunto/isidro6.jpg', 'conjunto/isidro7.jpg', 'conjunto/isidro8.jpg', 'conjunto/isidro9.jpg', 'conjunto/isidro10.jpg', 'conjunto/isidro11.jpg'],
+            'videos': [] 
         },
         'vaca-lima': {
             'titulo': 'Residencia Vaca Lima',
             'ubicacion': 'Proyecto Residencial Privado',
-            'descripcion': 'Vivienda de diseño exclusivo que fusiona la robustez del acero con acabados arquitectónicos de alta gama. Este proyecto destaca por sus vigas estructurales a la vista, diseño de escaleras flotantes y pasamanos personalizados que se convierten en protagonistas del interiorismo. La estructura principal fue meticulosamente calculada y ensamblada por nuestros soldadores calificados para ofrecer la máxima resistencia sísmica, permitiendo espacios abiertos y luminosos sin sacrificar la elegancia.',
-            'fotos': [
-                'vaca/vaca1.jpg',
-                'vaca/vaca2.jpg', 
-                'vaca/vaca3.jpg', 
-                'vaca/vaca4.jpg',
-                'vaca/vaca5.jpg',
-                'vaca/vaca6.jpg',
-                'vaca/vaca7.jpg',
-                'vaca/vaca8.jpg',
-                'vaca/vaca9.jpg',
-                'vaca/vaca10.jpg',
-                'vaca/vaca11.jpg',
-                'vaca/vaca12.jpg'
-                ],
+            'descripcion': 'Vivienda de diseño exclusivo que fusiona la robustez del acero con acabados arquitectónicos de alta gama...',
+            'fotos': ['vaca/vaca1.jpg', 'vaca/vaca2.jpg', 'vaca/vaca3.jpg', 'vaca/vaca4.jpg', 'vaca/vaca5.jpg', 'vaca/vaca6.jpg', 'vaca/vaca7.jpg', 'vaca/vaca8.jpg', 'vaca/vaca9.jpg', 'vaca/vaca10.jpg', 'vaca/vaca11.jpg', 'vaca/vaca12.jpg'],
             'videos': ['vaca/vaca_video1.mp4','vaca/vaca_video2.mp4','vaca/vaca_video3.mp4']
         },
         'residencia-art':{
             'titulo': 'Residencia Arteaga',
             'ubicacion': 'Proyecto Residencial Sangolquí',
-            'descripcion': 'Proyecto de vivienda con estructura metálica portante de dos niveles, compuesta por columnas y vigas tipo IPE prefabricadas, diseñadas conforme a cálculos estructurales de acuerdo con las solicitaciones específicas del proyecto. Los elementos estructurales fueron prefabricados en taller y posteriormente montados en obra mediante izaje, garantizando alta precisión geométrica, rapidez en la ejecución y un estricto control de calidad. Esta solución constructiva permite una estructura eficiente, segura y adaptable a los requerimientos arquitectónicos del diseño residencial.',
-            'fotos': [
-                'arteaga/arteaga1.jpg',
-                'arteaga/arteaga2.jpg',
-                'arteaga/arteaga3.jpg',
-                'arteaga/arteaga4.jpg',
-                'arteaga/arteaga5.jpg',
-                'arteaga/arteaga6.jpg',
-                'arteaga/arteaga7.jpg',
-                'arteaga/arteaga8.jpg',
-                'arteaga/arteaga9.jpg',
-                'arteaga/arteaga10.jpg',
-                'arteaga/arteaga11.jpg',
-                'arteaga/arteaga12.jpg',
-                'arteaga/arteaga13.jpg',
-                'arteaga/arteaga14.jpg'
-            ],
-            'videos': [
-                'arteaga/arteaga_video1.mp4'
-            ]
-
+            'descripcion': 'Proyecto de vivienda con estructura metálica portante de dos niveles, compuesta por columnas y vigas tipo IPE...',
+            'fotos': ['arteaga/arteaga1.jpg', 'arteaga/arteaga2.jpg', 'arteaga/arteaga3.jpg', 'arteaga/arteaga4.jpg', 'arteaga/arteaga5.jpg', 'arteaga/arteaga6.jpg', 'arteaga/arteaga7.jpg', 'arteaga/arteaga8.jpg', 'arteaga/arteaga9.jpg', 'arteaga/arteaga10.jpg', 'arteaga/arteaga11.jpg', 'arteaga/arteaga12.jpg', 'arteaga/arteaga13.jpg', 'arteaga/arteaga14.jpg'],
+            'videos': ['arteaga/arteaga_video1.mp4']
         }
     }
 
     proyecto = datos_proyectos.get(proyecto_id)
     return render(request, 'web/detalle_proyecto.html', {'p': proyecto})
+
+def contacto(request):
+    return render(request, 'web/contacto.html')
+
+
+
+# =======================================================
+# DEFINICIÓN DE ROLES (RBAC) -> Siempre van arriba del ERP
+# =======================================================
+def es_admin(user):
+    return user.is_superuser
+
+def es_solicitante(user):
+    return user.groups.filter(name='Solicitante').exists() or user.is_superuser
+
+def es_bodeguero(user):
+    return user.groups.filter(name='Bodeguero').exists() or user.is_superuser
+
+
+
+# =======================================================
+# VISTAS DEL SISTEMA ERP (INTERNO)
+# =======================================================
+
+@login_required(login_url='login')
+def dashboard_erp(request):
+    mis_requerimientos = Requerimiento.objects.filter(solicitante=request.user).order_by('-fecha_solicitud')
+    context = {
+        'requerimientos': mis_requerimientos
+    }
+    return render(request, 'web/erp/dashboard.html', context)
+
+@login_required(login_url='login')
+@user_passes_test(es_solicitante, login_url='dashboard_erp')
+def crear_requerimiento(request):
+    if request.method == 'POST':
+        form_req = RequerimientoForm(request.POST)
+        if form_req.is_valid():
+            nuevo_req = form_req.save(commit=False)
+            nuevo_req.solicitante = request.user 
+            nuevo_req.save() 
+            
+            messages.success(request, f'Ticket {nuevo_req.folio} creado con éxito. Ahora añade los materiales.')
+            return redirect('añadir_materiales', req_id=nuevo_req.id)
+    else:
+        form_req = RequerimientoForm()
+
+    return render(request, 'web/erp/crear_requerimiento.html', {'form': form_req})
+
+@login_required(login_url='login')
+@user_passes_test(es_solicitante, login_url='dashboard_erp')
+def añadir_materiales(request, req_id):
+    requerimiento = get_object_or_404(Requerimiento, id=req_id, solicitante=request.user)
+    detalles = requerimiento.detalles.all() 
+
+    if request.method == 'POST':
+        form_detalle = DetalleRequerimientoForm(request.POST)
+        if form_detalle.is_valid():
+            nuevo_detalle = form_detalle.save(commit=False)
+            nuevo_detalle.requerimiento = requerimiento
+            nuevo_detalle.save()
+            messages.success(request, 'Material añadido al ticket.')
+            return redirect('añadir_materiales', req_id=requerimiento.id)
+    else:
+        form_detalle = DetalleRequerimientoForm()
+
+    context = {
+        'requerimiento': requerimiento,
+        'detalles': detalles,
+        'form': form_detalle
+    }
+    return render(request, 'web/erp/añadir_materiales.html', context)
+
+
+# --- VISTA EXCLUSIVA PARA EL DUEÑO ---
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def gestionar_empleados(request):
+    # Truco: Creamos los roles automáticamente si no existen en la BD
+    Group.objects.get_or_create(name='Bodeguero')
+    Group.objects.get_or_create(name='Solicitante')
+
+    # Traemos a todos los empleados que no sean el dueño
+    empleados = User.objects.filter(is_superuser=False).order_by('-date_joined')
+
+    if request.method == 'POST':
+        form = RegistroEmpleadoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Empleado registrado y rol asignado correctamente.')
+            return redirect('gestionar_empleados')
+        else:
+            messages.error(request, 'Hubo un error. Revisa que el usuario no exista ya.')
+    else:
+        form = RegistroEmpleadoForm()
+
+    return render(request, 'web/erp/gestionar_empleados.html', {'form': form, 'empleados': empleados})
