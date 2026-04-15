@@ -1,6 +1,7 @@
 from django import forms
 from .models import Requerimiento, DetalleRequerimiento, MovimientoInventario
 from django.contrib.auth.models import User, Group
+from .models import OrdenCompra, DetalleOrdenCompra
 
 class RequerimientoForm(forms.ModelForm):
     class Meta:
@@ -48,3 +49,21 @@ class RegistroEmpleadoForm(forms.ModelForm):
             rol = self.cleaned_data['rol']
             user.groups.add(rol) # Se le asigna el rol elegido en el formulario
         return user
+    
+class OrdenCompraForm(forms.ModelForm):
+    class Meta:
+        model = OrdenCompra
+        fields = ['proveedor', 'documento_respaldo']
+        widgets = {
+            'proveedor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre del Proveedor / Ferretería'}),
+            'documento_respaldo': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+
+class DetalleOrdenCompraForm(forms.ModelForm):
+    class Meta:
+        model = DetalleOrdenCompra
+        fields = ['material', 'cantidad_pedida']
+        widgets = {
+            'material': forms.Select(attrs={'class': 'form-select'}),
+            'cantidad_pedida': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.1'}),
+        }

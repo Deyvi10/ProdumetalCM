@@ -18,8 +18,9 @@
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow">
         <div class="container">
-            <a class="navbar-brand fw-bold tracking-wide" href="{% url 'inicio' %}">
-                <i class="bi bi-buildings-fill me-2 text-warning"></i>PRODUMETAL <span class="text-warning">CM</span>
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'inicio' %}">
+                <img src="{% static 'web/img/logo.jpg' %}" alt="Logo" width="40" height="40" class="d-inline-block align-text-top me-2 rounded">
+                <span class="fw-bold tracking-tight">PRODUMETAL <span class="text-primary">CM</span></span>
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">

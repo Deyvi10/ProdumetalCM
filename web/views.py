@@ -2,11 +2,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
+from django.db.models import F
 
 # Importaciones de Modelos y Formularios
-from .models import Requerimiento, Material, Proyecto
+from .models import Requerimiento, Material, Proyecto, MovimientoInventario
 from .forms import RequerimientoForm, DetalleRequerimientoForm, RegistroEmpleadoForm
 
+# NUEVOS IMPORTS PARA GENERACIÓN DE PDF
+from django.template.loader import get_template
+from django.http import HttpResponse
+from xhtml2pdf import pisa
+import os
+from django.conf import settings
 
 # =======================================================
 # VISTAS DE LA PÁGINA WEB PÚBLICA
@@ -138,10 +145,31 @@ def es_bodeguero(user):
 
 @login_required(login_url='login')
 def dashboard_erp(request):
-    mis_requerimientos = Requerimiento.objects.filter(solicitante=request.user).order_by('-fecha_solicitud')
-    context = {
-        'requerimientos': mis_requerimientos
-    }
+    usuario = request.user
+    context = {}
+
+    # 1. VISTA DEL DUEÑO / ADMINISTRADOR
+    if es_admin(usuario):
+        context['rol'] = 'Administrador'
+        # Ve los tickets que necesitan su firma/aprobación
+        context['tickets_pendientes'] = Requerimiento.objects.filter(estado='PENDIENTE').order_by('fecha_solicitud')
+        # Ve las últimas salidas o ingresos de bodega
+        context['ultimos_movimientos'] = MovimientoInventario.objects.all().order_by('-fecha_hora')[:5]
+        
+    # 2. VISTA DEL BODEGUERO
+    elif es_bodeguero(usuario):
+        context['rol'] = 'Bodeguero'
+        # El bodeguero solo atiende tickets que el dueño ya aprobó
+        context['tickets_por_despachar'] = Requerimiento.objects.filter(estado='APROBADO').order_by('fecha_solicitud')
+        # Alertas críticas de materiales a punto de agotarse
+        context['alertas_stock'] = Material.objects.filter(stock_actual__lte=F('stock_minimo'), is_active=True)
+
+    # 3. VISTA DEL SOLICITANTE / TÉCNICO
+    else:
+        context['rol'] = 'Solicitante'
+        # Solo ve lo suyo
+        context['mis_requerimientos'] = Requerimiento.objects.filter(solicitante=usuario).order_by('-fecha_solicitud')
+
     return render(request, 'web/erp/dashboard.html', context)
 
 @login_required(login_url='login')
@@ -209,3 +237,100 @@ def gestionar_empleados(request):
         form = RegistroEmpleadoForm()
 
     return render(request, 'web/erp/gestionar_empleados.html', {'form': form, 'empleados': empleados})
+
+# --- VISTAS DE ÓRDENES DE COMPRA (Abastecimiento) ---
+
+@login_required(login_url='login')
+@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+def crear_orden_compra(request):
+    if request.method == 'POST':
+        form = OrdenCompraForm(request.POST, request.FILES)
+        if form.is_valid():
+            nueva_oc = form.save(commit=False)
+            nueva_oc.creado_por = request.user
+            nueva_oc.save()
+            return redirect('añadir_items_oc', oc_id=nueva_oc.id)
+    else:
+        form = OrdenCompraForm()
+    return render(request, 'web/erp/crear_oc.html', {'form': form})
+
+@login_required(login_url='login')
+@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+def recibir_orden_compra(request, oc_id):
+    oc = get_object_or_404(OrdenCompra, id=oc_id)
+    if oc.estado != 'RECIBIDA':
+        # LA MAGIA: Actualización masiva de Stock
+        detalles = oc.detalles.all()
+        for item in detalles:
+            material = item.material
+            material.stock_actual += item.cantidad_pedida # Sumamos al stock
+            material.save()
+
+            # Registramos el movimiento en la auditoría inalterable
+            MovimientoInventario.objects.create(
+                material=material,
+                tipo='INGRESO',
+                cantidad=item.cantidad_pedida,
+                responsable=request.user,
+                orden_compra_asociada=oc
+            )
+        
+        oc.estado = 'RECIBIDA'
+        oc.save()
+        messages.success(request, f"Orden {oc.folio} recibida. Stock actualizado y archivado.")
+    
+    return redirect('dashboard_erp')
+
+# --- VISTA DE APROBACIÓN (Solo Administrador) ---
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def procesar_ticket(request, req_id, accion):
+    ticket = get_object_or_404(Requerimiento, id=req_id)
+    if accion == 'aprobar':
+        ticket.estado = 'APROBADO'
+        messages.success(request, f"Ticket {ticket.folio} aprobado para despacho.")
+    elif accion == 'rechazar':
+        ticket.estado = 'RECHAZADO'
+        messages.warning(request, f"Ticket {ticket.folio} ha sido rechazado.")
+    
+    ticket.save()
+    return redirect('dashboard_erp')
+
+# =======================================================
+# MÓDULO DE REPORTES Y EXPORTACIÓN PDF
+# =======================================================
+
+@login_required(login_url='login')
+def imprimir_pdf_ticket(request, req_id):
+    # 1. Buscamos el ticket en la base de datos
+    ticket = get_object_or_404(Requerimiento, id=req_id)
+    detalles = ticket.detalles.all()
+    
+    # 2. Preparamos los datos que irán al PDF
+    # Para que xhtml2pdf lea el logo correctamente, necesitamos la ruta absoluta del servidor
+    logo_path = os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg')
+    
+    context = {
+        'ticket': ticket,
+        'detalles': detalles,
+        'logo_path': logo_path,
+        'fecha_impresion': timezone.now()
+    }
+    
+    # 3. Cargamos el diseño HTML del PDF
+    template = get_template('web/erp/pdf_ticket.html')
+    html = template.render(context)
+    
+    # 4. Creamos el PDF y forzamos su descarga
+    response = HttpResponse(content_type='application/pdf')
+    # Si quieres que se abra en el navegador, quita el 'attachment;'
+    response['Content-Disposition'] = f'attachment; filename="Comprobante_Entrega_{ticket.folio}.pdf"'
+    
+    # 5. Ejecutamos la conversión
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Hubo un error al generar el PDF de ProduMetal')
+    return response
+
+# (Opcional por ahora) Más adelante haremos el PDF de la Orden de Compra de la misma forma

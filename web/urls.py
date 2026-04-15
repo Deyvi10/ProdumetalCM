@@ -20,5 +20,6 @@ urlpatterns = [
     path('erp/dashboard/', views.dashboard_erp, name='dashboard_erp'),
     path('erp/nuevo-ticket/', views.crear_requerimiento, name='crear_requerimiento'),
     path('erp/ticket/<int:req_id>/materiales/', views.añadir_materiales, name='añadir_materiales'),
+    path('erp/ticket/<int:req_id>/pdf/', views.imprimir_pdf_ticket, name='imprimir_pdf_ticket'),
     path('erp/empleados/', views.gestionar_empleados, name='gestionar_empleados'),
 ]
