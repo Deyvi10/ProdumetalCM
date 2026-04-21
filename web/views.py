@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.db.models import F
+from axes.models import AccessAttempt
 
 # Importaciones de Modelos y Formularios
 from .models import Requerimiento, Material, Proyecto, MovimientoInventario
@@ -334,3 +335,30 @@ def imprimir_pdf_ticket(request, req_id):
     return response
 
 # (Opcional por ahora) Más adelante haremos el PDF de la Orden de Compra de la misma forma
+
+# =======================================================
+# MÓDULO DE SEGURIDAD (Gestión de Bloqueos)
+# =======================================================
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def gestionar_bloqueos(request):
+    # Traemos todos los registros de usuarios bloqueados o con intentos fallidos
+    intentos_fallidos = AccessAttempt.objects.all().order_by('-attempt_time')
+    
+    return render(request, 'web/erp/gestionar_bloqueos.html', {
+        'intentos': intentos_fallidos
+    })
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def desbloquear_usuario(request, intento_id):
+    # Buscamos el registro específico del bloqueo
+    intento = get_object_or_404(AccessAttempt, id=intento_id)
+    usuario = intento.username
+    
+    # Al eliminar el registro, la cuenta se desbloquea automáticamente
+    intento.delete()
+    
+    messages.success(request, f"¡El usuario '{usuario}' ha sido desbloqueado con éxito! Ya puede iniciar sesión.")
+    return redirect('gestionar_bloqueos')

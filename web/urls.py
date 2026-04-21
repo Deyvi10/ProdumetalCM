@@ -22,4 +22,7 @@ urlpatterns = [
     path('erp/ticket/<int:req_id>/materiales/', views.añadir_materiales, name='añadir_materiales'),
     path('erp/ticket/<int:req_id>/pdf/', views.imprimir_pdf_ticket, name='imprimir_pdf_ticket'),
     path('erp/empleados/', views.gestionar_empleados, name='gestionar_empleados'),
+    # --- RUTAS DE SEGURIDAD ---
+    path('erp/seguridad/bloqueos/', views.gestionar_bloqueos, name='gestionar_bloqueos'),
+    path('erp/seguridad/desbloquear/<int:intento_id>/', views.desbloquear_usuario, name='desbloquear_usuario'),
 ]
