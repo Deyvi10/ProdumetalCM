@@ -67,3 +67,29 @@ class DetalleOrdenCompraForm(forms.ModelForm):
             'material': forms.Select(attrs={'class': 'form-select'}),
             'cantidad_pedida': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.1'}),
         }
+
+from django import forms
+from .models import Proyecto
+
+class ProyectoForm(forms.ModelForm):
+    class Meta:
+        model = Proyecto
+        fields = ['nombre', 'centro_costos', 'is_active']
+        labels = {
+            'nombre': 'Nombre del Proyecto',
+            'centro_costos': 'Centro de Costos (ID Único)',
+            'is_active': '¿Proyecto Activo?',
+        }
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-control rounded-3',
+                'placeholder': 'Ej: Estructura Galpón Sector A'
+            }),
+            'centro_costos': forms.TextInput(attrs={
+                'class': 'form-control rounded-3',
+                'placeholder': 'Ej: PM-2024-001'
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+        }

@@ -7,7 +7,7 @@ from axes.models import AccessAttempt
 
 # Importaciones de Modelos y Formularios
 from .models import Requerimiento, Material, Proyecto, MovimientoInventario
-from .forms import RequerimientoForm, DetalleRequerimientoForm, RegistroEmpleadoForm
+from .forms import RequerimientoForm, DetalleRequerimientoForm, RegistroEmpleadoForm, ProyectoForm
 
 # NUEVOS IMPORTS PARA GENERACIÓN DE PDF
 from django.template.loader import get_template
@@ -362,3 +362,46 @@ def desbloquear_usuario(request, intento_id):
     
     messages.success(request, f"¡El usuario '{usuario}' ha sido desbloqueado con éxito! Ya puede iniciar sesión.")
     return redirect('gestionar_bloqueos')
+
+# Busca la sección del ERP y añade estas funciones
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def gestionar_proyectos(request):
+    proyectos = Proyecto.objects.all().order_by('-fecha_creacion')
+    
+    if request.method == 'POST':
+        form = ProyectoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "¡Nuevo proyecto creado con éxito!")
+            return redirect('gestionar_proyectos')
+    else:
+        form = ProyectoForm()
+    
+    return render(request, 'web/erp/gestionar_proyectos.html', {
+        'proyectos': proyectos,
+        'form': form,
+        'rol': 'Administrador'
+    })
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def alternar_estado_proyecto(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    proyecto.is_active = not proyecto.is_active
+    proyecto.save()
+    
+    estado = "activado" if proyecto.is_active else "desactivado"
+    messages.success(request, f"Proyecto '{proyecto.nombre}' {estado} correctamente.")
+    return redirect('gestionar_proyectos')
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def editar_proyecto(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    if request.method == 'POST':
+        form = ProyectoForm(request.POST, instance=proyecto)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Proyecto '{proyecto.nombre}' actualizado.")
+    return redirect('gestionar_proyectos')

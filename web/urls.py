@@ -25,4 +25,7 @@ urlpatterns = [
     # --- RUTAS DE SEGURIDAD ---
     path('erp/seguridad/bloqueos/', views.gestionar_bloqueos, name='gestionar_bloqueos'),
     path('erp/seguridad/desbloquear/<int:intento_id>/', views.desbloquear_usuario, name='desbloquear_usuario'),
+    path('erp/proyectos/', views.gestionar_proyectos, name='gestionar_proyectos'),
+    path('erp/proyectos/estado/<int:proyecto_id>/', views.alternar_estado_proyecto, name='alternar_estado_proyecto'),
+    path('erp/proyectos/editar/<int:proyecto_id>/', views.editar_proyecto, name='editar_proyecto'),
 ]
