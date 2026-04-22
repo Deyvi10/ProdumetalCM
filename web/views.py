@@ -6,8 +6,11 @@ from django.db.models import F
 from axes.models import AccessAttempt
 
 # Importaciones de Modelos y Formularios
-from .models import Requerimiento, Material, Proyecto, MovimientoInventario
-from .forms import RequerimientoForm, DetalleRequerimientoForm, RegistroEmpleadoForm, ProyectoForm
+from .models import Requerimiento, Material, Proyecto, MovimientoInventario, OrdenCompra
+from .forms import (
+    RequerimientoForm, DetalleRequerimientoForm, RegistroEmpleadoForm, 
+    ProyectoForm, OrdenCompraForm, DetalleOrdenCompraForm # <-- Añadir este último
+)
 
 # NUEVOS IMPORTS PARA GENERACIÓN DE PDF
 from django.template.loader import get_template
@@ -15,6 +18,7 @@ from django.http import HttpResponse
 from xhtml2pdf import pisa
 import os
 from django.conf import settings
+from django.utils import timezone
 
 # =======================================================
 # VISTAS DE LA PÁGINA WEB PÚBLICA
@@ -405,3 +409,35 @@ def editar_proyecto(request, proyecto_id):
             form.save()
             messages.success(request, f"Proyecto '{proyecto.nombre}' actualizado.")
     return redirect('gestionar_proyectos')
+
+@login_required(login_url='login')
+@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+def añadir_items_oc(request, oc_id):
+    # Obtenemos la orden de compra
+    oc = get_object_or_404(OrdenCompra, id=oc_id)
+    detalles = oc.detalles.all() # Relación definida en tu models.py (related_name='detalles')
+
+    if request.method == 'POST':
+        form_detalle = DetalleOrdenCompraForm(request.POST)
+        if form_detalle.is_valid():
+            material = form_detalle.cleaned_data['material']
+            # Evitamos duplicados: si el material ya está en la lista, sumamos la cantidad
+            item_existente = detalles.filter(material=material).first()
+            if item_existente:
+                item_existente.cantidad_pedida += form_detalle.cleaned_data['cantidad_pedida']
+                item_existente.save()
+            else:
+                nuevo_item = form_detalle.save(commit=False)
+                nuevo_item.orden_compra = oc
+                nuevo_item.save()
+            
+            messages.success(request, f'Se añadió {material.nombre} a la orden.')
+            return redirect('añadir_items_oc', oc_id=oc.id)
+    else:
+        form_detalle = DetalleOrdenCompraForm()
+
+    return render(request, 'web/erp/añadir_items_oc.html', {
+        'oc': oc,
+        'detalles': detalles,
+        'form': form_detalle
+    })

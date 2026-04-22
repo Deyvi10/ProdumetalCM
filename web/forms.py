@@ -53,19 +53,32 @@ class RegistroEmpleadoForm(forms.ModelForm):
 class OrdenCompraForm(forms.ModelForm):
     class Meta:
         model = OrdenCompra
-        fields = ['proveedor', 'documento_respaldo']
+        # Ajusta estos campos según lo que tengas en tu models.py
+        fields = ['proveedor', 'numero_factura', 'observaciones', 'archivo_factura'] 
+        labels = {
+            'proveedor': 'Nombre del Proveedor / Empresa',
+            'numero_factura': 'N° de Factura (Opcional)',
+            'observaciones': 'Notas o Comentarios',
+            'archivo_factura': 'Subir Factura PDF (Opcional)',
+        }
         widgets = {
-            'proveedor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre del Proveedor / Ferretería'}),
-            'documento_respaldo': forms.FileInput(attrs={'class': 'form-control'}),
+            'proveedor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Aceros del Ecuador S.A.'}),
+            'numero_factura': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: 001-002-000012345'}),
+            'observaciones': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Condiciones de entrega o estado de la caja...'}),
+            'archivo_factura': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
 class DetalleOrdenCompraForm(forms.ModelForm):
     class Meta:
         model = DetalleOrdenCompra
         fields = ['material', 'cantidad_pedida']
+        labels = {
+            'material': 'Seleccionar Material/Insumo',
+            'cantidad_pedida': 'Cantidad',
+        }
         widgets = {
-            'material': forms.Select(attrs={'class': 'form-select'}),
-            'cantidad_pedida': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.1'}),
+            'material': forms.Select(attrs={'class': 'form-select fw-bold'}),
+            'cantidad_pedida': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
         }
 
 from django import forms

@@ -52,7 +52,11 @@ class OrdenCompra(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='ordenes_compra')
     estado = models.CharField(max_length=20, choices=ESTADOS, default='BORRADOR')
-    
+    numero_factura = models.CharField(max_length=100, blank=True, null=True, verbose_name="N° de Factura")
+    observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
+    archivo_factura = models.FileField(upload_to='facturas_compras/', blank=True, null=True, verbose_name="Archivo Factura")    
+
+
     # Aquí se guardará la factura o guía de remisión del proveedor
     documento_respaldo = models.FileField(
         upload_to='compras_facturas/%Y/%m/', 
