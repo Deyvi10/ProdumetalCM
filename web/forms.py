@@ -128,3 +128,17 @@ class MaterialForm(forms.ModelForm):
             'stock_minimo': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'ubicacion': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Pasillo A, Estante 3'}),
         }
+
+class AjusteInventarioForm(forms.Form):
+    cantidad_ajuste = forms.DecimalField(
+        max_digits=10, decimal_places=2,
+        label="Cantidad a Ajustar (+ o -)",
+        help_text="Usa números negativos para restar (Ej: -5) o positivos para sumar (Ej: 10).",
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-lg fw-bold', 'placeholder': 'Ej: -10'})
+    )
+    observaciones = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Ej: Se descontaron 10 planchas por error de digitación en la OC-2026-001...'}),
+        label="Justificación del Ajuste",
+        required=True, # ¡ESTO ES CLAVE! No pueden hacer un ajuste sin explicar por qué
+        help_text="Explica detalladamente por qué se realiza este ajuste manual. Esta nota quedará en la auditoría inalterable."
+    )

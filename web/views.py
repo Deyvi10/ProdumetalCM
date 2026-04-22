@@ -4,12 +4,12 @@ from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.db.models import F
 from axes.models import AccessAttempt
-
+from django.db import transaction
 # Importaciones de Modelos y Formularios
 from .models import Requerimiento, Material, Proyecto, MovimientoInventario, OrdenCompra
 from .forms import (
     RequerimientoForm, DetalleRequerimientoForm, RegistroEmpleadoForm, 
-    ProyectoForm, OrdenCompraForm, DetalleOrdenCompraForm # <-- Añadir este último
+    ProyectoForm, OrdenCompraForm, DetalleOrdenCompraForm, AjusteInventarioForm
 )
 
 # NUEVOS IMPORTS PARA GENERACIÓN DE PDF
@@ -164,10 +164,11 @@ def dashboard_erp(request):
     # 2. VISTA DEL BODEGUERO
     elif es_bodeguero(usuario):
         context['rol'] = 'Bodeguero'
-        # El bodeguero solo atiende tickets que el dueño ya aprobó
-        context['tickets_por_despachar'] = Requerimiento.objects.filter(estado='APROBADO').order_by('fecha_solicitud')
-        # Alertas críticas de materiales a punto de agotarse
-        context['alertas_stock'] = Material.objects.filter(stock_actual__lte=F('stock_minimo'), is_active=True)
+        # Tickets que el dueño aprobó y hay que entregar
+        context['tickets_por_despachar'] = Requerimiento.objects.filter(estado='APROBADO')
+        # Órdenes de compra que están "En Borrador" para seguir editando
+        context['mis_compras_pendientes'] = OrdenCompra.objects.filter(estado='BORRADOR')
+        context['alertas_stock'] = Material.objects.filter(stock_actual__lte=F('stock_minimo'))
 
     # 3. VISTA DEL SOLICITANTE / TÉCNICO
     else:
@@ -519,8 +520,20 @@ def listar_ordenes_compra(request):
 @user_passes_test(es_bodeguero, login_url='dashboard_erp')
 def inventario_actual(request):
     from django.db.models import F
+    # 1. Base: Solo materiales activos
     materiales = Material.objects.filter(is_active=True).order_by('tipo', 'nombre')
-    alertas = materiales.filter(stock_actual__lte=F('stock_minimo'))
+    
+    # 2. Las alertas globales (para el banner superior)
+    alertas = Material.objects.filter(is_active=True, stock_actual__lte=F('stock_minimo'))
+
+    # 3. FILTROS DINÁMICOS (Lo que faltaba)
+    tipo_filtro = request.GET.get('tipo')
+    if tipo_filtro in ['MATERIAL', 'CONSUMIBLE']:
+        materiales = materiales.filter(tipo=tipo_filtro)
+        
+    alerta_filtro = request.GET.get('alerta')
+    if alerta_filtro == '1':
+        materiales = materiales.filter(stock_actual__lte=F('stock_minimo'))
 
     return render(request, 'web/erp/inventario.html', {
         'materiales': materiales,
@@ -541,3 +554,58 @@ def crear_material(request):
     else:
         form = MaterialForm()
     return render(request, 'web/erp/crear_material.html', {'form': form})
+
+@login_required(login_url='login')
+@user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
+def editar_material(request, material_id):
+    material = get_object_or_404(Material, id=material_id)
+    
+    if request.method == 'POST':
+        form = MaterialForm(request.POST, instance=material)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'¡Material {material.sku} actualizado correctamente!')
+            return redirect('inventario_actual')
+    else:
+        form = MaterialForm(instance=material)
+        
+    return render(request, 'web/erp/crear_material.html', {
+        'form': form,
+        'editando': True, 
+        'material': material
+    })
+
+# Vista para Ajustes Manuales
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp') # <--- ¡Aquí estaba el error! Ya está corregido a es_admin
+def realizar_ajuste(request, material_id):
+    material = get_object_or_404(Material, id=material_id)
+    
+    if request.method == 'POST':
+        form = AjusteInventarioForm(request.POST)
+        if form.is_valid():
+            cantidad_ajuste = form.cleaned_data['cantidad_ajuste']
+            observaciones = form.cleaned_data['observaciones']
+            
+            with transaction.atomic():
+                material.stock_actual += cantidad_ajuste
+                material.save()
+                
+                MovimientoInventario.objects.create(
+                    material=material,
+                    tipo='AJUSTE',
+                    cantidad=cantidad_ajuste,
+                    responsable=request.user,
+                    observaciones=observaciones
+                )
+                
+            messages.success(request, f'¡Ajuste de {cantidad_ajuste} aplicado correctamente a {material.sku}! Registrado en bitácora.')
+            return redirect('inventario_actual')
+    else:
+        form = AjusteInventarioForm()
+        
+    return render(request, 'web/erp/ajustar_inventario.html', {
+        'form': form,
+        'material': material,
+        'rol': 'Administrador'
+    })

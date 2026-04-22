@@ -41,5 +41,12 @@ urlpatterns = [
     # Seguridad
     path('erp/seguridad/bloqueos/', views.gestionar_bloqueos, name='gestionar_bloqueos'),
     path('erp/seguridad/desbloquear/<int:intento_id>/', views.desbloquear_usuario, name='desbloquear_usuario'),
+    
+    # Inventario
+    path('erp/inventario/', views.inventario_actual, name='inventario_actual'),
     path('erp/inventario/nuevo-material/', views.crear_material, name='crear_material'),
+    path('erp/inventario/editar-material/<int:material_id>/', views.editar_material, name='editar_material'),
+    
+    # NUEVA RUTA: Ajustes Manuales (Auditoría)
+    path('erp/inventario/ajustar/<int:material_id>/', views.realizar_ajuste, name='realizar_ajuste'),
 ]

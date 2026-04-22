@@ -152,8 +152,11 @@ class MovimientoInventario(models.Model):
     responsable = models.ForeignKey(User, on_delete=models.PROTECT)
     
     # Enlaces cruzados para saber exactamente DE DÓNDE vino o A DÓNDE fue
-    requerimiento_asociado = models.ForeignKey(Requerimiento, on_delete=models.SET_NULL, null=True, blank=True)
-    orden_compra_asociada = models.ForeignKey(OrdenCompra, on_delete=models.SET_NULL, null=True, blank=True)
+    requerimiento_asociado = models.ForeignKey('Requerimiento', on_delete=models.SET_NULL, null=True, blank=True)
+    orden_compra_asociada = models.ForeignKey('OrdenCompra', on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # ---> ¡NUEVO CAMPO PARA LA AUDITORÍA! <---
+    observaciones = models.TextField(blank=True, null=True, help_text="Justificación detallada si es un AJUSTE manual")
     
     certificado_calidad = models.FileField(
         upload_to='certificados/%Y/%m/', blank=True, null=True,
