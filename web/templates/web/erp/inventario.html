@@ -1,0 +1,690 @@
+{% extends 'web/base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================
+     INVENTARIO — Estilo Industrial Refinado
+     ProduMetal CM · Sistema ERP
+  ============================================ */
+
+  :root {
+    --pm-dark:    #0d1117;
+    --pm-surface: #161b22;
+    --pm-border:  #21262d;
+    --pm-steel:   #1c2128;
+    --pm-amber:   #e6a817;
+    --pm-amber2:  #ffd166;
+    --pm-red:     #e05252;
+    --pm-green:   #3fb950;
+    --pm-blue:    #58a6ff;
+    --pm-text:    #e6edf3;
+    --pm-muted:   #7d8590;
+    --pm-font-display: 'Barlow Condensed', sans-serif;
+    --pm-font-body:    'Barlow', sans-serif;
+  }
+
+  .inv-page {
+    background: var(--pm-dark);
+    min-height: 100vh;
+    font-family: var(--pm-font-body);
+    color: var(--pm-text);
+    padding: 0;
+  }
+
+  /* ---- TOP BAR ---- */
+  .inv-topbar {
+    background: var(--pm-surface);
+    border-bottom: 1px solid var(--pm-border);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .inv-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+  }
+
+  .inv-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--pm-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    transition: color 0.2s;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 4px;
+  }
+  .inv-back-btn:hover { color: var(--pm-text); border-color: var(--pm-muted); }
+
+  .inv-page-title {
+    font-family: var(--pm-font-display);
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--pm-text);
+    line-height: 1;
+  }
+
+  .inv-page-title span {
+    color: var(--pm-amber);
+  }
+
+  .inv-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .btn-pm {
+    font-family: var(--pm-font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 0.55rem 1.2rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+  }
+
+  .btn-pm-primary {
+    background: var(--pm-amber);
+    color: #000;
+  }
+  .btn-pm-primary:hover {
+    background: var(--pm-amber2);
+    color: #000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(230,168,23,0.3);
+  }
+
+  .btn-pm-ghost {
+    background: transparent;
+    color: var(--pm-muted);
+    border: 1px solid var(--pm-border);
+  }
+  .btn-pm-ghost:hover {
+    color: var(--pm-text);
+    border-color: var(--pm-muted);
+  }
+
+  /* ---- ALERTAS BANNER ---- */
+  .alertas-banner {
+    margin: 1.5rem 2rem 0;
+    background: linear-gradient(135deg, rgba(224,82,82,0.08) 0%, rgba(224,82,82,0.03) 100%);
+    border: 1px solid rgba(224,82,82,0.3);
+    border-left: 4px solid var(--pm-red);
+    border-radius: 6px;
+    padding: 1rem 1.4rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    animation: slideIn 0.4s ease;
+  }
+
+  .alertas-icon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .alertas-content h4 {
+    font-family: var(--pm-font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--pm-red);
+    letter-spacing: 0.5px;
+    margin-bottom: 0.3rem;
+  }
+
+  .alertas-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+  }
+
+  .alerta-chip {
+    background: rgba(224,82,82,0.15);
+    border: 1px solid rgba(224,82,82,0.3);
+    color: #ff8080;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 3px;
+    font-family: var(--pm-font-display);
+    letter-spacing: 0.5px;
+  }
+
+  /* ---- STATS STRIP ---- */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1px;
+    background: var(--pm-border);
+    margin: 1.5rem 2rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .stat-cell {
+    background: var(--pm-surface);
+    padding: 1.2rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-cell::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent-color, var(--pm-amber));
+    opacity: 0.6;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--pm-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .stat-value {
+    font-family: var(--pm-font-display);
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--accent-color, var(--pm-text));
+    line-height: 1;
+  }
+
+  .stat-sub {
+    font-size: 0.72rem;
+    color: var(--pm-muted);
+    margin-top: 0.3rem;
+  }
+
+  /* ---- FILTROS ---- */
+  .filtros-bar {
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+  }
+
+  .filtro-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--pm-muted);
+  }
+
+  .filtro-chip {
+    font-family: var(--pm-font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 0.35rem 0.9rem;
+    border-radius: 3px;
+    border: 1px solid var(--pm-border);
+    background: transparent;
+    color: var(--pm-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+
+  .filtro-chip:hover,
+  .filtro-chip.active {
+    background: var(--pm-amber);
+    border-color: var(--pm-amber);
+    color: #000;
+  }
+
+  .search-box {
+    margin-left: auto;
+    position: relative;
+  }
+
+  .search-input {
+    background: var(--pm-surface);
+    border: 1px solid var(--pm-border);
+    border-radius: 4px;
+    color: var(--pm-text);
+    font-family: var(--pm-font-body);
+    font-size: 0.82rem;
+    padding: 0.4rem 0.9rem 0.4rem 2.2rem;
+    width: 220px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-input:focus { border-color: var(--pm-amber); }
+  .search-input::placeholder { color: var(--pm-muted); }
+
+  .search-icon {
+    position: absolute;
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--pm-muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+  }
+
+  /* ---- TABLA ---- */
+  .inv-table-wrap {
+    padding: 0 2rem 2rem;
+  }
+
+  .inv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .inv-table thead tr {
+    background: var(--pm-steel);
+    border-bottom: 2px solid var(--pm-amber);
+  }
+
+  .inv-table th {
+    font-family: var(--pm-font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--pm-muted);
+    padding: 0.9rem 1rem;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .inv-table tbody tr {
+    border-bottom: 1px solid var(--pm-border);
+    transition: background 0.15s;
+    animation: fadeRow 0.3s ease both;
+  }
+
+  .inv-table tbody tr:hover {
+    background: rgba(230,168,23,0.04);
+  }
+
+  .inv-table td {
+    padding: 0.85rem 1rem;
+    color: var(--pm-text);
+    vertical-align: middle;
+  }
+
+  /* SKU badge */
+  .sku-badge {
+    font-family: var(--pm-font-display);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: var(--pm-steel);
+    border: 1px solid var(--pm-border);
+    color: var(--pm-amber);
+    padding: 0.2rem 0.6rem;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  /* Tipo badge */
+  .tipo-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+  }
+  .tipo-material {
+    background: rgba(88,166,255,0.12);
+    border: 1px solid rgba(88,166,255,0.25);
+    color: var(--pm-blue);
+  }
+  .tipo-consumible {
+    background: rgba(230,168,23,0.12);
+    border: 1px solid rgba(230,168,23,0.25);
+    color: var(--pm-amber);
+  }
+
+  /* Stock bar */
+  .stock-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .stock-num {
+    font-family: var(--pm-font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    min-width: 40px;
+  }
+
+  .stock-ok   { color: var(--pm-green); }
+  .stock-warn { color: var(--pm-amber); }
+  .stock-crit { color: var(--pm-red); }
+
+  .stock-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: var(--pm-border);
+    border-radius: 2px;
+    overflow: hidden;
+    min-width: 60px;
+  }
+
+  .stock-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  .fill-ok   { background: var(--pm-green); }
+  .fill-warn { background: var(--pm-amber); }
+  .fill-crit { background: var(--pm-red); }
+
+  .alerta-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--pm-red);
+    box-shadow: 0 0 6px var(--pm-red);
+    animation: pulse 1.5s infinite;
+    margin-left: 4px;
+  }
+
+  .ubicacion-text {
+    font-size: 0.78rem;
+    color: var(--pm-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  /* Estado row alerta */
+  .inv-table tbody tr.row-alerta {
+    border-left: 3px solid var(--pm-red);
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--pm-muted);
+  }
+
+  .empty-state .empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.4;
+  }
+
+  .empty-state h3 {
+    font-family: var(--pm-font-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    color: var(--pm-text);
+    opacity: 0.5;
+  }
+
+  /* Animations */
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeRow {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Stagger rows */
+  .inv-table tbody tr:nth-child(1)  { animation-delay: 0.04s; }
+  .inv-table tbody tr:nth-child(2)  { animation-delay: 0.08s; }
+  .inv-table tbody tr:nth-child(3)  { animation-delay: 0.12s; }
+  .inv-table tbody tr:nth-child(4)  { animation-delay: 0.16s; }
+  .inv-table tbody tr:nth-child(5)  { animation-delay: 0.20s; }
+  .inv-table tbody tr:nth-child(6)  { animation-delay: 0.24s; }
+  .inv-table tbody tr:nth-child(7)  { animation-delay: 0.28s; }
+  .inv-table tbody tr:nth-child(8)  { animation-delay: 0.32s; }
+  .inv-table tbody tr:nth-child(9)  { animation-delay: 0.36s; }
+  .inv-table tbody tr:nth-child(10) { animation-delay: 0.40s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="inv-page">
+
+  <!-- TOP BAR -->
+  <div class="inv-topbar">
+    <div class="inv-topbar-left">
+      <a href="{% url 'dashboard_erp' %}" class="inv-back-btn">
+        ← Dashboard
+      </a>
+      <div>
+        <div class="inv-page-title">Inventario <span>Bodega</span></div>
+      </div>
+    </div>
+    <div class="inv-topbar-right">
+      <a href="{% url 'crear_material' %}" class="btn-pm btn-pm-primary">
+        + Nuevo Material
+      </a>
+      <a href="{% url 'crear_orden_compra' %}" class="btn-pm btn-pm-ghost">
+        📋 Nueva OC
+      </a>
+    </div>
+  </div>
+
+  <!-- BANNER DE ALERTAS -->
+  {% if alertas %}
+  <div class="alertas-banner">
+    <div class="alertas-icon">⚠️</div>
+    <div class="alertas-content">
+      <h4>{{ alertas.count }} Material{{ alertas.count|pluralize }} bajo stock mínimo</h4>
+      <p style="font-size:0.8rem; color:#aaa; margin:0;">
+        Estos ítems necesitan reabastecimiento urgente. Genera una orden de compra.
+      </p>
+      <div class="alertas-chips">
+        {% for mat in alertas %}
+          <span class="alerta-chip">{{ mat.sku }} · {{ mat.nombre|truncatechars:25 }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ESTADÍSTICAS -->
+  {% with total=materiales.count %}
+  <div class="stats-strip">
+    <div class="stat-cell" style="--accent-color: var(--pm-amber);">
+      <div class="stat-label">Total ítems</div>
+      <div class="stat-value">{{ total }}</div>
+      <div class="stat-sub">En catálogo activo</div>
+    </div>
+    <div class="stat-cell" style="--accent-color: var(--pm-blue);">
+      <div class="stat-label">Materiales</div>
+      <div class="stat-value">{{ materiales|length }}</div>
+      <div class="stat-sub">Estructurales y acero</div>
+    </div>
+    <div class="stat-cell" style="--accent-color: var(--pm-red);">
+      <div class="stat-label">Alertas stock</div>
+      <div class="stat-value">{{ alertas.count }}</div>
+      <div class="stat-sub">Bajo mínimo definido</div>
+    </div>
+    <div class="stat-cell" style="--accent-color: var(--pm-green);">
+      <div class="stat-label">Estado</div>
+      <div class="stat-value" style="font-size:1rem; padding-top:0.4rem;">
+        {% if alertas.count == 0 %}✔ OK{% else %}⚠ Revisar{% endif %}
+      </div>
+      <div class="stat-sub">Estado general bodega</div>
+    </div>
+  </div>
+  {% endwith %}
+
+  <!-- FILTROS Y BÚSQUEDA -->
+  <div class="filtros-bar">
+    <span class="filtro-label">Filtrar:</span>
+    <a href="?" class="filtro-chip {% if not request.GET.tipo %}active{% endif %}">Todos</a>
+    <a href="?tipo=MATERIAL" class="filtro-chip {% if request.GET.tipo == 'MATERIAL' %}active{% endif %}">Materiales</a>
+    <a href="?tipo=CONSUMIBLE" class="filtro-chip {% if request.GET.tipo == 'CONSUMIBLE' %}active{% endif %}">Consumibles</a>
+    <a href="?alerta=1" class="filtro-chip {% if request.GET.alerta %}active{% endif %}">⚠ Solo alertas</a>
+
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Buscar SKU o nombre..." />
+    </div>
+  </div>
+
+  <!-- TABLA DE INVENTARIO -->
+  <div class="inv-table-wrap">
+    <table class="inv-table" id="invTable">
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Tipo</th>
+          <th>Nombre / Descripción</th>
+          <th>Stock Actual</th>
+          <th>Mín.</th>
+          <th>Ubicación</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mat in materiales %}
+        {% with pct=mat.stock_actual|default:0 %}
+        <tr class="{% if mat.stock_actual <= mat.stock_minimo %}row-alerta{% endif %}"
+            data-nombre="{{ mat.nombre|lower }}" data-sku="{{ mat.sku|lower }}">
+
+          <!-- SKU -->
+          <td>
+            <span class="sku-badge">{{ mat.sku }}</span>
+          </td>
+
+          <!-- Tipo -->
+          <td>
+            {% if mat.tipo == 'MATERIAL' %}
+              <span class="tipo-badge tipo-material">Estructural</span>
+            {% else %}
+              <span class="tipo-badge tipo-consumible">Consumible</span>
+            {% endif %}
+          </td>
+
+          <!-- Nombre -->
+          <td>
+            <div style="font-weight:600; font-size:0.88rem;">
+              {{ mat.nombre }}
+              {% if mat.stock_actual <= mat.stock_minimo %}
+                <span class="alerta-dot" title="Stock bajo mínimo"></span>
+              {% endif %}
+            </div>
+            {% if mat.descripcion %}
+              <div style="font-size:0.73rem; color:var(--pm-muted); margin-top:2px;">
+                {{ mat.descripcion|truncatechars:60 }}
+              </div>
+            {% endif %}
+          </td>
+
+          <!-- Stock con barra visual -->
+          <td>
+            <div class="stock-wrap">
+              <span class="stock-num
+                {% if mat.stock_actual <= mat.stock_minimo %}stock-crit
+                {% elif mat.stock_actual <= mat.stock_minimo|add:mat.stock_minimo %}stock-warn
+                {% else %}stock-ok{% endif %}">
+                {{ mat.stock_actual }}
+              </span>
+              <div class="stock-bar-bg">
+                <div class="stock-bar-fill
+                  {% if mat.stock_actual <= mat.stock_minimo %}fill-crit
+                  {% elif mat.stock_actual <= mat.stock_minimo|add:mat.stock_minimo %}fill-warn
+                  {% else %}fill-ok{% endif %}"
+                  style="width: {% if mat.stock_minimo > 0 %}{% widthratio mat.stock_actual mat.stock_minimo 100 %}{% else %}100{% endif %}%;
+                         max-width:100%;">
+                </div>
+              </div>
+            </div>
+          </td>
+
+          <!-- Mínimo -->
+          <td style="color:var(--pm-muted); font-size:0.82rem;">
+            {{ mat.stock_minimo }}
+          </td>
+
+          <!-- Ubicación -->
+          <td>
+            <span class="ubicacion-text">
+              📍 {{ mat.ubicacion }}
+            </span>
+          </td>
+
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr>
+          <td colspan="6">
+            <div class="empty-state">
+              <div class="empty-icon">📦</div>
+              <h3>Bodega vacía</h3>
+              <p style="font-size:0.85rem; margin-bottom:1.5rem;">
+                Aún no hay materiales registrados en el sistema.
+              </p>
+              <a href="{% url 'crear_material' %}" class="btn-pm btn-pm-primary">
+                + Añadir primer material
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  // Búsqueda en tiempo real sin recargar
+  document.getElementById('searchInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase().trim();
+    document.querySelectorAll('#invTable tbody tr[data-nombre]').forEach(row => {
+      const nombre = row.dataset.nombre || '';
+      const sku    = row.dataset.sku    || '';
+      row.style.display = (nombre.includes(q) || sku.includes(q)) ? '' : 'none';
+    });
+  });
+</script>
+{% endblock %}

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Comprobante de Entrega - {{ ticket.folio }}</title>
+    <title>Orden de Compra - {{ oc.folio }}</title>
     <style>
         @page {
             size: A4;
@@ -69,11 +69,23 @@
         h2, h4 { margin: 0; padding: 0; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
-        .watermark { color: #e74c3c; font-weight: bold; font-size: 14px;}
+
+        /* Color diferente al ticket para distinguirla visualmente */
+        .estado-oc { color: #27ae60; font-weight: bold; font-size: 14px; }
+
+        .aviso-recibida {
+            background-color: #eafaf1;
+            border: 1px solid #27ae60;
+            padding: 8px 12px;
+            margin-bottom: 16px;
+            font-size: 11px;
+            color: #1e8449;
+        }
     </style>
 </head>
 <body>
 
+    <!-- ENCABEZADO: logo + nombre empresa + folio OC -->
     <table class="header-table">
         <tr>
             <td style="width: 30%;">
@@ -82,44 +94,53 @@
             <td style="width: 40%; text-align: center;">
                 <h2 style="color: #2c3e50;">PRODUMETAL CM</h2>
                 <p>Gestión de Estructuras y Carpintería Metálica</p>
-                <p><strong>COMPROBANTE DE DESPACHO INTERNO</strong></p>
+                <p><strong>ORDEN DE COMPRA</strong></p>
             </td>
             <td style="width: 30%; text-align: right;">
-                <h4>FOLIO: <span style="color: #e74c3c;">{{ ticket.folio }}</span></h4>
-                <p>Fecha de Solicitud: {{ ticket.fecha_solicitud|date:"d/M/Y" }}</p>
+                <h4>FOLIO: <span style="color: #27ae60;">{{ oc.folio }}</span></h4>
+                <p>Fecha de Emisión: {{ oc.fecha_creacion|date:"d/M/Y" }}</p>
                 <p>Fecha de Impresión: {{ fecha_impresion|date:"d/M/Y H:i" }}</p>
             </td>
         </tr>
     </table>
 
+    <!-- Aviso visual si la OC ya fue recibida en bodega -->
+    {% if oc.estado == 'RECIBIDA' %}
+    <div class="aviso-recibida">
+        ✔ Esta orden ya fue recibida en bodega y el stock fue actualizado correctamente.
+    </div>
+    {% endif %}
+
+    <!-- DATOS GENERALES DE LA OC -->
     <table class="info-table">
         <tr>
-            <td class="bg-gray">Proyecto Destino:</td>
-            <td>{{ ticket.proyecto.nombre }} (CC: {{ ticket.proyecto.centro_costos }})</td>
+            <td class="bg-gray">Proveedor:</td>
+            <td>{{ oc.proveedor }}</td>
             <td class="bg-gray">Estado:</td>
-            <td class="watermark">{{ ticket.get_estado_display|upper }}</td>
+            <td class="estado-oc">{{ oc.get_estado_display|upper }}</td>
         </tr>
         <tr>
-            <td class="bg-gray">Solicitado por (Técnico):</td>
-            <td>{{ ticket.solicitante.get_full_name|default:ticket.solicitante.username }}</td>
-            <td class="bg-gray">Aprobado por:</td>
-            <td>Gerencia General</td>
+            <td class="bg-gray">Emitida por (Bodeguero):</td>
+            <td>{{ oc.creado_por.get_full_name|default:oc.creado_por.username }}</td>
+            <td class="bg-gray">N° de Factura:</td>
+            <td>{{ oc.numero_factura|default:"Pendiente" }}</td>
         </tr>
         <tr>
             <td class="bg-gray">Observaciones:</td>
-            <td colspan="3">{{ ticket.observaciones|default:"Ninguna" }}</td>
+            <td colspan="3">{{ oc.observaciones|default:"Ninguna" }}</td>
         </tr>
     </table>
 
-    <h4 style="margin-bottom: 5px;">Detalle de Materiales y Consumibles</h4>
+    <!-- TABLA DE MATERIALES PEDIDOS -->
+    <h4 style="margin-bottom: 5px;">Detalle de Materiales Solicitados al Proveedor</h4>
     <table class="materials-table">
         <thead>
             <tr>
                 <th style="width: 15%;">Código SKU</th>
                 <th style="width: 15%;">Tipo</th>
                 <th style="width: 40%;">Descripción del Material</th>
-                <th style="width: 15%; text-align: center;">Cant. Solicitada</th>
-                <th style="width: 15%; text-align: center;">Cant. Despachada</th>
+                <th style="width: 15%; text-align: center;">Cant. Pedida</th>
+                <th style="width: 15%; text-align: center;">Cant. Recibida</th>
             </tr>
         </thead>
         <tbody>
@@ -128,43 +149,45 @@
                 <td>{{ item.material.sku }}</td>
                 <td>{{ item.material.get_tipo_display }}</td>
                 <td>{{ item.material.nombre }}</td>
-                <td class="text-center">{{ item.cantidad_solicitada }}</td>
-                <td class="text-center"><strong>{{ item.cantidad_despachada }}</strong></td>
+                <td class="text-center">{{ item.cantidad_pedida }}</td>
+                <td class="text-center"><strong>{{ item.cantidad_recibida }}</strong></td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5" class="text-center">No se encontraron materiales en este requerimiento.</td>
+                <td colspan="5" class="text-center">No se encontraron materiales en esta orden de compra.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
+    <!-- FIRMAS -->
     <table class="signatures">
         <tr>
             <td style="width: 33%;">
                 <br><br><br><br>
                 <div class="signature-line">
-                    <strong>Recibí Conforme</strong><br>
-                    Técnico / Solicitante
-                </div>
-            </td>
-            <td style="width: 33%;">
-                <br><br><br><br>
-                <div class="signature-line">
-                    <strong>Entregado Por</strong><br>
+                    <strong>Emitido Por</strong><br>
                     Bodeguero Responsable
                 </div>
             </td>
             <td style="width: 33%;">
                 <br><br><br><br>
                 <div class="signature-line">
-                    <strong>Visto Bueno</strong><br>
-                    Gerencia / Supervisión
+                    <strong>Autorizado Por</strong><br>
+                    Gerencia / Administración
+                </div>
+            </td>
+            <td style="width: 33%;">
+                <br><br><br><br>
+                <div class="signature-line">
+                    <strong>Recibido Por</strong><br>
+                    Representante del Proveedor
                 </div>
             </td>
         </tr>
     </table>
 
+    <!-- PIE DE PÁGINA con número de página -->
     <div id="footerContent" style="text-align: right; font-size: 10px; color: #7f8c8d;">
         Documento generado automáticamente por el Sistema ERP ProduMetal CM - Página <pdf:pagenumber> de <pdf:pagecount>
     </div>

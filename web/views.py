@@ -277,7 +277,8 @@ def recibir_orden_compra(request, oc_id):
                 tipo='INGRESO',
                 cantidad=item.cantidad_pedida,
                 responsable=request.user,
-                orden_compra_asociada=oc
+                orden_compra_asociada=oc,
+                certificado_calidad=oc.documento_respaldo  # ← AÑADIR ESTA LÍNEA
             )
         
         oc.estado = 'RECIBIDA'
@@ -308,35 +309,87 @@ def procesar_ticket(request, req_id, accion):
 
 @login_required(login_url='login')
 def imprimir_pdf_ticket(request, req_id):
-    # 1. Buscamos el ticket en la base de datos
+ 
+    # 1. Buscamos el ticket
     ticket = get_object_or_404(Requerimiento, id=req_id)
+ 
+    # 2. CORRECCIÓN DE SEGURIDAD: verificar permiso
+    #    Antes no existía esta validación — cualquier usuario
+    #    logueado podía ver el PDF de cualquier ticket con
+    #    solo cambiar el número en la URL.
+    if not es_admin(request.user) and ticket.solicitante != request.user:
+        messages.error(request, "No tienes permiso para ver este comprobante.")
+        return redirect('dashboard_erp')
+ 
+    # 3. Preparamos el contexto para el template HTML del PDF
     detalles = ticket.detalles.all()
-    
-    # 2. Preparamos los datos que irán al PDF
-    # Para que xhtml2pdf lea el logo correctamente, necesitamos la ruta absoluta del servidor
     logo_path = os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg')
-    
+ 
     context = {
         'ticket': ticket,
         'detalles': detalles,
         'logo_path': logo_path,
-        'fecha_impresion': timezone.now()
+        'fecha_impresion': timezone.now(),
     }
-    
-    # 3. Cargamos el diseño HTML del PDF
+ 
+    # 4. Cargamos el diseño HTML del PDF
     template = get_template('web/erp/pdf_ticket.html')
     html = template.render(context)
-    
-    # 4. Creamos el PDF y forzamos su descarga
+ 
+    # 5. Preparamos la respuesta HTTP como PDF
     response = HttpResponse(content_type='application/pdf')
-    # Si quieres que se abra en el navegador, quita el 'attachment;'
-    response['Content-Disposition'] = f'attachment; filename="Comprobante_Entrega_{ticket.folio}.pdf"'
-    
-    # 5. Ejecutamos la conversión
+    response['Content-Disposition'] = (
+        f'attachment; filename="Comprobante_Entrega_{ticket.folio}.pdf"'
+    )
+ 
+    # 6. Convertimos HTML → PDF
     pisa_status = pisa.CreatePDF(html, dest=response)
     if pisa_status.err:
-        return HttpResponse('Hubo un error al generar el PDF de ProduMetal')
+        return HttpResponse('Hubo un error al generar el PDF del ticket.')
+ 
     return response
+
+
+@login_required(login_url='login')
+def imprimir_pdf_oc(request, oc_id):
+ 
+    # 1. Solo bodeguero o admin pueden imprimir una OC
+    if not es_bodeguero(request.user) and not es_admin(request.user):
+        messages.error(request, "No tienes permiso para imprimir órdenes de compra.")
+        return redirect('dashboard_erp')
+ 
+    # 2. Buscamos la orden de compra con todos sus ítems
+    oc = get_object_or_404(OrdenCompra, id=oc_id)
+    detalles = oc.detalles.all()
+ 
+    # 3. Ruta absoluta del logo (igual que en el ticket)
+    logo_path = os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg')
+ 
+    context = {
+        'oc': oc,
+        'detalles': detalles,
+        'logo_path': logo_path,
+        'fecha_impresion': timezone.now(),
+    }
+ 
+    # 4. Renderizamos el template HTML de la OC
+    #    (debes crear web/templates/web/erp/pdf_oc.html
+    #     copiando pdf_ticket.html y adaptando los campos)
+    template = get_template('web/erp/pdf_oc.html')
+    html = template.render(context)
+ 
+    # 5. Generamos y devolvemos el PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = (
+        f'attachment; filename="OrdenCompra_{oc.folio}.pdf"'
+    )
+ 
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Hubo un error al generar el PDF de la orden de compra.')
+ 
+    return response
+
 
 # (Opcional por ahora) Más adelante haremos el PDF de la Orden de Compra de la misma forma
 
@@ -428,7 +481,7 @@ def añadir_items_oc(request, oc_id):
                 item_existente.save()
             else:
                 nuevo_item = form_detalle.save(commit=False)
-                nuevo_item.orden_compra = oc
+                nuevo_item.orden = oc
                 nuevo_item.save()
             
             messages.success(request, f'Se añadió {material.nombre} a la orden.')
@@ -441,3 +494,50 @@ def añadir_items_oc(request, oc_id):
         'detalles': detalles,
         'form': form_detalle
     })
+
+# --- LISTA DE ÓRDENES DE COMPRA ---
+@login_required(login_url='login')
+@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+def listar_ordenes_compra(request):
+    ordenes = OrdenCompra.objects.all().order_by('-fecha_creacion')
+
+    # Filtro opcional por estado desde la URL (?estado=BORRADOR)
+    estado = request.GET.get('estado')
+    if estado:
+        ordenes = ordenes.filter(estado=estado)
+
+    return render(request, 'web/erp/listar_oc.html', {
+        'ordenes': ordenes,
+        'estados': OrdenCompra.ESTADOS,
+        'estado_filtro': estado,
+        'rol': 'Bodeguero',
+    })
+
+
+# --- INVENTARIO ACTUAL (lo que hay en bodega ahora mismo) ---
+@login_required(login_url='login')
+@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+def inventario_actual(request):
+    from django.db.models import F
+    materiales = Material.objects.filter(is_active=True).order_by('tipo', 'nombre')
+    alertas = materiales.filter(stock_actual__lte=F('stock_minimo'))
+
+    return render(request, 'web/erp/inventario.html', {
+        'materiales': materiales,
+        'alertas': alertas,
+        'rol': 'Bodeguero',
+    })
+
+@login_required(login_url='login')
+@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+def crear_material(request):
+    from .forms import MaterialForm
+    if request.method == 'POST':
+        form = MaterialForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Material añadido al catálogo correctamente.')
+            return redirect('inventario_actual')
+    else:
+        form = MaterialForm()
+    return render(request, 'web/erp/crear_material.html', {'form': form})

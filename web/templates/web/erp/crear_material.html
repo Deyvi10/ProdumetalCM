@@ -1,0 +1,106 @@
+{% extends 'web/base.html' %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Encabezado -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="{% url 'inventario_actual' %}" class="btn btn-outline-secondary btn-sm">
+            ← Volver al Inventario
+        </a>
+        <div>
+            <h2 class="mb-0 fw-bold">Añadir Material al Catálogo</h2>
+            <small class="text-muted">Registra un nuevo material o consumible en bodega</small>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white py-3">
+                    <h5 class="mb-0">📦 Datos del Material</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        <!-- SKU y Tipo en la misma fila -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">{{ form.sku.label }}</label>
+                                {{ form.sku }}
+                                {% if form.sku.errors %}
+                                    <div class="text-danger small mt-1">{{ form.sku.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">{{ form.tipo.label }}</label>
+                                {{ form.tipo }}
+                                {% if form.tipo.errors %}
+                                    <div class="text-danger small mt-1">{{ form.tipo.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Nombre -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">{{ form.nombre.label }}</label>
+                            {{ form.nombre }}
+                            {% if form.nombre.errors %}
+                                <div class="text-danger small mt-1">{{ form.nombre.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Descripción -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">{{ form.descripcion.label }}</label>
+                            {{ form.descripcion }}
+                        </div>
+
+                        <!-- Stock actual y mínimo -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">{{ form.stock_actual.label }}</label>
+                                {{ form.stock_actual }}
+                                <div class="form-text">Cantidad que hay físicamente ahora.</div>
+                                {% if form.stock_actual.errors %}
+                                    <div class="text-danger small mt-1">{{ form.stock_actual.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">{{ form.stock_minimo.label }}</label>
+                                {{ form.stock_minimo }}
+                                <div class="form-text">Bajo este número el sistema genera alerta.</div>
+                                {% if form.stock_minimo.errors %}
+                                    <div class="text-danger small mt-1">{{ form.stock_minimo.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Ubicación -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">{{ form.ubicacion.label }}</label>
+                            {{ form.ubicacion }}
+                            {% if form.ubicacion.errors %}
+                                <div class="text-danger small mt-1">{{ form.ubicacion.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success px-4">
+                                ✔ Guardar Material
+                            </button>
+                            <a href="{% url 'inventario_actual' %}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

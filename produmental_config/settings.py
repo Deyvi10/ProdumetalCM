@@ -4,6 +4,8 @@ Django settings for produmental_config project.
 
 from pathlib import Path
 import os # Importante para leer variables de entorno
+import dj_database_url
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -78,10 +80,10 @@ WSGI_APPLICATION = 'produmental_config.wsgi.application'
 # ==============================================================================
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600
+    )
 }
 # NOTA: Para subir a Render, más adelante cambiaremos esto a PostgreSQL para no perder datos.
 
@@ -151,3 +153,16 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000 
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+    SECRET_KEY = config('DJANGO_SECRET_KEY')
+    DEBUG = config('DJANGO_DEBUG', cast=bool)
+
+
+# Cloudinary — solo activar cuando vayas a producción en Render
+# Cuando tengas las credenciales, descomenta esto y añádelas al .env
+# CLOUDINARY_STORAGE = {
+#     'CLOUD_NAME': config('CLOUDINARY_NAME'),
+#     'API_KEY': config('CLOUDINARY_KEY'),
+#     'API_SECRET': config('CLOUDINARY_SECRET'),
+# }
+# DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'

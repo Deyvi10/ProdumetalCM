@@ -1,7 +1,7 @@
 from django import forms
 from .models import Requerimiento, DetalleRequerimiento, MovimientoInventario
 from django.contrib.auth.models import User, Group
-from .models import OrdenCompra, DetalleOrdenCompra
+from .models import OrdenCompra, DetalleOrdenCompra, Material
 
 class RequerimientoForm(forms.ModelForm):
     class Meta:
@@ -53,19 +53,18 @@ class RegistroEmpleadoForm(forms.ModelForm):
 class OrdenCompraForm(forms.ModelForm):
     class Meta:
         model = OrdenCompra
-        # Ajusta estos campos según lo que tengas en tu models.py
-        fields = ['proveedor', 'numero_factura', 'observaciones', 'archivo_factura'] 
+        fields = ['proveedor', 'numero_factura', 'observaciones', 'documento_respaldo']
         labels = {
             'proveedor': 'Nombre del Proveedor / Empresa',
             'numero_factura': 'N° de Factura (Opcional)',
             'observaciones': 'Notas o Comentarios',
-            'archivo_factura': 'Subir Factura PDF (Opcional)',
+            'documento_respaldo': 'Subir Factura PDF (Opcional)',
         }
         widgets = {
             'proveedor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Aceros del Ecuador S.A.'}),
             'numero_factura': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: 001-002-000012345'}),
-            'observaciones': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Condiciones de entrega o estado de la caja...'}),
-            'archivo_factura': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'observaciones': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'documento_respaldo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
 class DetalleOrdenCompraForm(forms.ModelForm):
@@ -105,4 +104,27 @@ class ProyectoForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
+        }
+
+class MaterialForm(forms.ModelForm):
+    class Meta:
+        model = Material
+        fields = ['sku', 'nombre', 'tipo', 'descripcion', 'stock_actual', 'stock_minimo', 'ubicacion']
+        labels = {
+            'sku': 'Código / SKU',
+            'nombre': 'Nombre del Material',
+            'tipo': 'Categoría',
+            'descripcion': 'Descripción (opcional)',
+            'stock_actual': 'Cantidad inicial en bodega',
+            'stock_minimo': 'Stock mínimo (alerta)',
+            'ubicacion': 'Ubicación en bodega',
+        }
+        widgets = {
+            'sku': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: ACE-001'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Tubo cuadrado 40x40'}),
+            'tipo': forms.Select(attrs={'class': 'form-select'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'stock_actual': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'stock_minimo': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'ubicacion': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Pasillo A, Estante 3'}),
         }
