@@ -248,7 +248,7 @@ def gestionar_empleados(request):
 # --- VISTAS DE ÓRDENES DE COMPRA (Abastecimiento) ---
 
 @login_required(login_url='login')
-@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+@user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def crear_orden_compra(request):
     if request.method == 'POST':
         form = OrdenCompraForm(request.POST, request.FILES)
@@ -260,34 +260,95 @@ def crear_orden_compra(request):
     else:
         form = OrdenCompraForm()
     return render(request, 'web/erp/crear_oc.html', {'form': form})
-
 @login_required(login_url='login')
-@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+@user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
+def añadir_items_oc(request, oc_id):
+    oc = get_object_or_404(OrdenCompra, id=oc_id)
+    detalles = oc.detalles.all()
+
+    if request.method == 'POST':
+        form_detalle = DetalleOrdenCompraForm(request.POST)
+        if form_detalle.is_valid():
+            material = form_detalle.cleaned_data['material']
+            item_existente = detalles.filter(material=material).first()
+            if item_existente:
+                item_existente.cantidad_pedida += form_detalle.cleaned_data['cantidad_pedida']
+                item_existente.save()
+            else:
+                nuevo_item = form_detalle.save(commit=False)
+                nuevo_item.orden = oc
+                nuevo_item.save()
+            
+            messages.success(request, f'Se añadió {material.nombre} a la orden.')
+            return redirect('añadir_items_oc', oc_id=oc.id)
+    else:
+        form_detalle = DetalleOrdenCompraForm()
+
+    return render(request, 'web/erp/añadir_items_oc.html', {
+        'oc': oc, 'detalles': detalles, 'form': form_detalle
+    })
+
+# --- LISTA DE ÓRDENES DE COMPRA ---
+@login_required(login_url='login')
+@user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
+def listar_ordenes_compra(request):
+    es_administrador = es_admin(request.user)
+    
+    if es_administrador:
+        # El Dueño/Admin ve ABSOLUTAMENTE TODO
+        ordenes = OrdenCompra.objects.all().order_by('-fecha_creacion')
+        estados_permitidos = OrdenCompra.ESTADOS
+    else:
+        # REGLA ESTRICTA PARA BODEGUERO: Solo ve lo que ya fue Aprobado (EMITIDA en adelante)
+        ordenes = OrdenCompra.objects.exclude(estado='BORRADOR').order_by('-fecha_creacion')
+        
+        # Le ocultamos también el botón de "Borrador" de los filtros superiores
+        estados_permitidos = [est for est in OrdenCompra.ESTADOS if est[0] != 'BORRADOR']
+
+    estado = request.GET.get('estado')
+    if estado:
+        ordenes = ordenes.filter(estado=estado)
+
+    return render(request, 'web/erp/listar_oc.html', {
+        'ordenes': ordenes,
+        'estados': estados_permitidos, # <-- Usamos los estados filtrados
+        'estado_filtro': estado,
+        'rol': 'Administrador' if es_administrador else 'Bodeguero',
+    })
+
+# 4. Aprobar Orden de Compra (NUEVA: Solo Administrador)
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def aprobar_oc(request, oc_id):
+    oc = get_object_or_404(OrdenCompra, id=oc_id)
+    if oc.estado == 'BORRADOR':
+        oc.estado = 'EMITIDA' # Cambia el estado a Aprobada
+        oc.save()
+        messages.success(request, f"¡Orden de Compra {oc.folio} APROBADA! El bodeguero ya puede verla para recibir el stock.")
+    return redirect('listar_ordenes_compra')
+
+# 5. Recibir Orden (Ingresar a Bodega)
+@login_required(login_url='login')
+@user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def recibir_orden_compra(request, oc_id):
     oc = get_object_or_404(OrdenCompra, id=oc_id)
-    if oc.estado != 'RECIBIDA':
-        # LA MAGIA: Actualización masiva de Stock
+    if oc.estado == 'EMITIDA': # Solo se puede recibir si ya fue Aprobada (Emitida)
         detalles = oc.detalles.all()
         for item in detalles:
             material = item.material
-            material.stock_actual += item.cantidad_pedida # Sumamos al stock
+            material.stock_actual += item.cantidad_pedida
             material.save()
 
-            # Registramos el movimiento en la auditoría inalterable
             MovimientoInventario.objects.create(
-                material=material,
-                tipo='INGRESO',
-                cantidad=item.cantidad_pedida,
-                responsable=request.user,
-                orden_compra_asociada=oc,
-                certificado_calidad=oc.documento_respaldo  # ← AÑADIR ESTA LÍNEA
+                material=material, tipo='INGRESO', cantidad=item.cantidad_pedida,
+                responsable=request.user, orden_compra_asociada=oc, certificado_calidad=oc.documento_respaldo
             )
         
         oc.estado = 'RECIBIDA'
         oc.save()
-        messages.success(request, f"Orden {oc.folio} recibida. Stock actualizado y archivado.")
+        messages.success(request, f"Orden {oc.folio} recibida. Stock actualizado correctamente.")
     
-    return redirect('dashboard_erp')
+    return redirect('listar_ordenes_compra')
 
 # --- VISTA DE APROBACIÓN (Solo Administrador) ---
 
@@ -497,23 +558,6 @@ def añadir_items_oc(request, oc_id):
         'form': form_detalle
     })
 
-# --- LISTA DE ÓRDENES DE COMPRA ---
-@login_required(login_url='login')
-@user_passes_test(es_bodeguero, login_url='dashboard_erp')
-def listar_ordenes_compra(request):
-    ordenes = OrdenCompra.objects.all().order_by('-fecha_creacion')
-
-    # Filtro opcional por estado desde la URL (?estado=BORRADOR)
-    estado = request.GET.get('estado')
-    if estado:
-        ordenes = ordenes.filter(estado=estado)
-
-    return render(request, 'web/erp/listar_oc.html', {
-        'ordenes': ordenes,
-        'estados': OrdenCompra.ESTADOS,
-        'estado_filtro': estado,
-        'rol': 'Bodeguero',
-    })
 
 
 # --- INVENTARIO ACTUAL (lo que hay en bodega ahora mismo) ---
@@ -737,18 +781,19 @@ def eliminar_material(request, material_id):
         
     return redirect('inventario_actual')
 @login_required(login_url='login')
-def eliminar_proyecto_publico(request, proyecto_id):
-    # Protegemos la vista para que SOLO los administradores puedan borrar
-    if not request.user.is_staff:
-        messages.error(request, "Acceso denegado. Solo los administradores pueden eliminar proyectos del portafolio.")
-        return redirect('proyectos') # Redirige a la página de proyectos
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def eliminar_proyecto_erp(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    nombre_temp = proyecto.nombre
+    
+    try:
+        # Intento de borrado físico (Si es nuevo y no tiene tickets)
+        proyecto.delete()
+        messages.success(request, f'Proyecto "{nombre_temp}" eliminado definitivamente.')
+    except models.ProtectedError:
+        # Si ya tiene tickets asociados, no lo borramos, lo archivamos
+        proyecto.is_active = False
+        proyecto.save()
+        messages.warning(request, f'El proyecto "{nombre_temp}" tiene requerimientos asociados y no puede borrarse de la base de datos. Ha sido archivado.')
         
-    if request.method == 'POST':
-        # Reemplaza "Proyecto" por el nombre de tu modelo de proyectos públicos si es distinto
-        proyecto_a_borrar = get_object_or_404(Proyecto, id=proyecto_id)
-        nombre_proy = proyecto_a_borrar.titulo # Asumiendo que el campo se llama titulo
-        
-        proyecto_a_borrar.delete()
-        messages.success(request, f'El proyecto "{nombre_proy}" ha sido eliminado exitosamente de la web pública.')
-        
-    return redirect('proyectos') # Asegúrate de que 'proyectos' sea el name correcto de esta vista
+    return redirect('gestionar_proyectos')

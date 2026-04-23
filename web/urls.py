@@ -10,7 +10,6 @@ urlpatterns = [
     path('proyectos/', views.proyectos, name='proyectos'),
     path('contacto/', views.contacto, name='contacto'),
     path('especialidad/<str:tipo>/', views.detalle_especialidad, name='detalle_especialidad'),
-    path('proyectos/eliminar/<int:proyecto_id>/', views.eliminar_proyecto_publico, name='eliminar_proyecto_publico'),
     path('proyecto/<str:proyecto_id>/', views.detalle_proyecto, name='detalle_proyecto'),
 
     # Auth
@@ -31,6 +30,7 @@ urlpatterns = [
     path('erp/proyectos/', views.gestionar_proyectos, name='gestionar_proyectos'),
     path('erp/proyectos/estado/<int:proyecto_id>/', views.alternar_estado_proyecto, name='alternar_estado_proyecto'),
     path('erp/proyectos/editar/<int:proyecto_id>/', views.editar_proyecto, name='editar_proyecto'),
+    path('erp/proyectos/eliminar/<int:proyecto_id>/', views.eliminar_proyecto_erp, name='eliminar_proyecto_erp'),
 
     # Órdenes de Compra — todas adentro del array
     path('erp/ordenes-compra/', views.listar_ordenes_compra, name='listar_ordenes_compra'),
@@ -38,6 +38,7 @@ urlpatterns = [
     path('erp/ordenes-compra/<int:oc_id>/items/', views.añadir_items_oc, name='añadir_items_oc'),
     path('erp/ordenes-compra/recibir/<int:oc_id>/', views.recibir_orden_compra, name='recibir_orden_compra'),
     path('erp/ordenes-compra/<int:oc_id>/pdf/', views.imprimir_pdf_oc, name='imprimir_pdf_oc'),
+    path('erp/ordenes-compra/aprobar/<int:oc_id>/', views.aprobar_oc, name='aprobar_oc'),
 
     # Seguridad
     path('erp/seguridad/bloqueos/', views.gestionar_bloqueos, name='gestionar_bloqueos'),
