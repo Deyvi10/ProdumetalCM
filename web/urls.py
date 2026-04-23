@@ -10,6 +10,7 @@ urlpatterns = [
     path('proyectos/', views.proyectos, name='proyectos'),
     path('contacto/', views.contacto, name='contacto'),
     path('especialidad/<str:tipo>/', views.detalle_especialidad, name='detalle_especialidad'),
+    path('proyectos/eliminar/<int:proyecto_id>/', views.eliminar_proyecto_publico, name='eliminar_proyecto_publico'),
     path('proyecto/<str:proyecto_id>/', views.detalle_proyecto, name='detalle_proyecto'),
 
     # Auth
@@ -49,4 +50,7 @@ urlpatterns = [
     
     # NUEVA RUTA: Ajustes Manuales (Auditoría)
     path('erp/inventario/ajustar/<int:material_id>/', views.realizar_ajuste, name='realizar_ajuste'),
+    path('erp/inventario/auditoria/', views.historial_movimientos, name='historial_movimientos'),
+    path('erp/inventario/auditoria/pdf/', views.imprimir_pdf_auditoria, name='imprimir_pdf_auditoria'),
+    path('erp/inventario/eliminar/<int:material_id>/', views.eliminar_material, name='eliminar_material'),
 ]

@@ -5,6 +5,7 @@ from django.contrib.auth.models import User, Group
 from django.db.models import F
 from axes.models import AccessAttempt
 from django.db import transaction
+from django.core.paginator import Paginator
 # Importaciones de Modelos y Formularios
 from .models import Requerimiento, Material, Proyecto, MovimientoInventario, OrdenCompra
 from .forms import (
@@ -516,17 +517,19 @@ def listar_ordenes_compra(request):
 
 
 # --- INVENTARIO ACTUAL (lo que hay en bodega ahora mismo) ---
+# --- INVENTARIO ACTUAL (lo que hay en bodega ahora mismo) ---
 @login_required(login_url='login')
-@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+@user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def inventario_actual(request):
     from django.db.models import F
+    
     # 1. Base: Solo materiales activos
     materiales = Material.objects.filter(is_active=True).order_by('tipo', 'nombre')
     
-    # 2. Las alertas globales (para el banner superior)
+    # 2. Las alertas globales
     alertas = Material.objects.filter(is_active=True, stock_actual__lte=F('stock_minimo'))
 
-    # 3. FILTROS DINÁMICOS (Lo que faltaba)
+    # 3. FILTROS DINÁMICOS
     tipo_filtro = request.GET.get('tipo')
     if tipo_filtro in ['MATERIAL', 'CONSUMIBLE']:
         materiales = materiales.filter(tipo=tipo_filtro)
@@ -535,10 +538,13 @@ def inventario_actual(request):
     if alerta_filtro == '1':
         materiales = materiales.filter(stock_actual__lte=F('stock_minimo'))
 
+    # 4. DETERMINAR ROL REAL PARA MOSTRAR BOTONES
+    rol_actual = 'Administrador' if es_admin(request.user) else 'Bodeguero'
+
     return render(request, 'web/erp/inventario.html', {
         'materiales': materiales,
         'alertas': alertas,
-        'rol': 'Bodeguero',
+        'rol': rol_actual,
     })
 
 @login_required(login_url='login')
@@ -555,9 +561,13 @@ def crear_material(request):
         form = MaterialForm()
     return render(request, 'web/erp/crear_material.html', {'form': form})
 
+# Vista para Editar Material (Solo Bodeguero o Admin pueden corregir)
 @login_required(login_url='login')
 @user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def editar_material(request, material_id):
+    # ¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA! Importamos el formulario
+    from .forms import MaterialForm 
+    
     material = get_object_or_404(Material, id=material_id)
     
     if request.method == 'POST':
@@ -574,7 +584,7 @@ def editar_material(request, material_id):
         'editando': True, 
         'material': material
     })
-
+    
 # Vista para Ajustes Manuales
 @login_required(login_url='login')
 @user_passes_test(es_admin, login_url='dashboard_erp') # <--- ¡Aquí estaba el error! Ya está corregido a es_admin
@@ -609,3 +619,136 @@ def realizar_ajuste(request, material_id):
         'material': material,
         'rol': 'Administrador'
     })
+
+# --- BITÁCORA DE AUDITORÍA (Historial completo de movimientos) ---
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def historial_movimientos(request):
+    movimientos_list = MovimientoInventario.objects.all().order_by('-fecha_hora')
+    
+    tipo_filtro = request.GET.get('tipo')
+    if tipo_filtro:
+        movimientos_list = movimientos_list.filter(tipo=tipo_filtro)
+        
+    mes_filtro = request.GET.get('mes')
+    if mes_filtro:
+        try:
+            year, month = mes_filtro.split('-')
+            movimientos_list = movimientos_list.filter(fecha_hora__year=year, fecha_hora__month=month)
+        except ValueError:
+            pass 
+            
+    # NUEVO: Filtro por Proyecto (Solo los despachos van a proyectos)
+    proyecto_id = request.GET.get('proyecto')
+    if proyecto_id:
+        movimientos_list = movimientos_list.filter(requerimiento_asociado__proyecto_id=proyecto_id)
+
+    # Listas de Proyectos para el menú desplegable
+    proyectos_activos = Proyecto.objects.filter(is_active=True).order_by('nombre')
+    proyectos_inactivos = Proyecto.objects.filter(is_active=False).order_by('nombre')
+            
+    paginator = Paginator(movimientos_list, 30) 
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    return render(request, 'web/erp/auditoria.html', {
+        'page_obj': page_obj,
+        'tipo_filtro': tipo_filtro,
+        'mes_filtro': mes_filtro,
+        'proyecto_id': proyecto_id,
+        'proyectos_activos': proyectos_activos,
+        'proyectos_inactivos': proyectos_inactivos,
+        'rol': 'Administrador'
+    })
+
+
+# --- VISTA PARA GENERAR EL PDF DE LA AUDITORÍA (Reporte Dividido) ---
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def imprimir_pdf_auditoria(request):
+    movimientos = MovimientoInventario.objects.all().order_by('-fecha_hora')
+    
+    # Aplicar filtros
+    tipo_filtro = request.GET.get('tipo')
+    if tipo_filtro:
+        movimientos = movimientos.filter(tipo=tipo_filtro)
+        
+    mes_filtro = request.GET.get('mes')
+    if mes_filtro:
+        try:
+            year, month = mes_filtro.split('-')
+            movimientos = movimientos.filter(fecha_hora__year=year, fecha_hora__month=month)
+        except ValueError:
+            pass
+            
+    proyecto_id = request.GET.get('proyecto')
+    proyecto_obj = None
+    if proyecto_id:
+        movimientos = movimientos.filter(requerimiento_asociado__proyecto_id=proyecto_id)
+        proyecto_obj = get_object_or_404(Proyecto, id=proyecto_id)
+
+    # SEPARAR POR CATEGORÍAS PARA TABLAS DISTINTAS EN EL PDF
+    ingresos = movimientos.filter(tipo='INGRESO')
+    salidas = movimientos.filter(tipo='SALIDA')
+    ajustes = movimientos.filter(tipo='AJUSTE')
+
+    logo_path = os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg')
+    
+    context = {
+        'ingresos': ingresos,
+        'salidas': salidas,
+        'ajustes': ajustes,
+        'tipo_filtro': tipo_filtro,
+        'mes_filtro': mes_filtro,
+        'proyecto': proyecto_obj,
+        'logo_path': logo_path,
+        'fecha_impresion': timezone.now(),
+    }
+    
+    template = get_template('web/erp/pdf_auditoria.html')
+    html = template.render(context)
+    
+    response = HttpResponse(content_type='application/pdf')
+    nombre_archivo = f"Auditoria_{proyecto_obj.nombre.replace(' ', '_')}" if proyecto_obj else "Auditoria_Inventario_ProduMetal"
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}.pdf"'
+    
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Hubo un error al generar el PDF de la auditoría.')
+    return response
+
+from django.db import models 
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def eliminar_material(request, material_id):
+    material = get_object_or_404(Material, id=material_id)
+    nombre_temp = material.nombre
+    
+    try:
+        # Intento de borrado físico (Si es nuevo y no tiene historial)
+        material.delete()
+        messages.success(request, f'Material "{nombre_temp}" eliminado definitivamente.')
+    except models.ProtectedError:
+        # Si ya tiene movimientos asociados, no lo borramos, lo desactivamos
+        material.is_active = False
+        material.save()
+        messages.warning(request, f'El material "{nombre_temp}" tiene historial y no puede borrarse. Se ha desactivado del catálogo para auditoría.')
+        
+    return redirect('inventario_actual')
+@login_required(login_url='login')
+def eliminar_proyecto_publico(request, proyecto_id):
+    # Protegemos la vista para que SOLO los administradores puedan borrar
+    if not request.user.is_staff:
+        messages.error(request, "Acceso denegado. Solo los administradores pueden eliminar proyectos del portafolio.")
+        return redirect('proyectos') # Redirige a la página de proyectos
+        
+    if request.method == 'POST':
+        # Reemplaza "Proyecto" por el nombre de tu modelo de proyectos públicos si es distinto
+        proyecto_a_borrar = get_object_or_404(Proyecto, id=proyecto_id)
+        nombre_proy = proyecto_a_borrar.titulo # Asumiendo que el campo se llama titulo
+        
+        proyecto_a_borrar.delete()
+        messages.success(request, f'El proyecto "{nombre_proy}" ha sido eliminado exitosamente de la web pública.')
+        
+    return redirect('proyectos') # Asegúrate de que 'proyectos' sea el name correcto de esta vista

@@ -1,71 +1,138 @@
 {% extends 'web/base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <style>
-    /* Estilos para navegación interna */
-    .breadcrumb-minimal { background: transparent; padding: 0; margin-bottom: 1rem; font-size: 0.85rem; }
-    .breadcrumb-item + .breadcrumb-item::before { content: "›"; color: #94a3b8; }
-    .btn-back { 
-        background: #f1f5f9; color: #475569; border: none; 
-        padding: 8px 16px; border-radius: 10px; font-weight: 600;
-        transition: all 0.2s;
+    /* =========================================
+       PROYECTOS - ESTILO PREMIUM MINIMALISTA 
+       ========================================= */
+    :root {
+        --pm-bg: #0d1117;
+        --pm-surface: #161b22;
+        --pm-surface-hover: #1c2128;
+        --pm-border: #30363d;
+        --pm-text: #ffffff;
+        --pm-text-muted: #aab6c4;
+        
+        --pm-amber: #e6a817; 
+        --pm-blue: #58a6ff;
+        --pm-green: #3fb950;
+        --pm-red: #f85149;
+        
+        --font-display: 'Barlow Condensed', sans-serif;
+        --font-body: 'Barlow', sans-serif;
     }
-    .btn-back:hover { background: #e2e8f0; color: #1e293b; }
+
+    body { background-color: var(--pm-bg) !important; color: var(--pm-text) !important; font-family: var(--font-body); }
+    .text-muted, .text-secondary { color: var(--pm-text-muted) !important; }
+    .erp-container { margin-top: 30px; max-width: 1200px; }
+    
+    .title-erp { font-family: var(--font-display); font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
+    .title-erp span { color: var(--pm-amber); }
+
+    /* Componentes Core */
+    .card-minimal { background: var(--pm-surface); border: 1px solid var(--pm-border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    
+    /* Botones Estandarizados */
+    .btn-minimal { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; border-radius: 6px; padding: 0.5rem 1rem; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px;}
+    .btn-amber { background: var(--pm-amber); color: #000; border: none; }
+    .btn-amber:hover { background: #ffd166; color: #000; }
+    
+    /* Tablas Modernas Oscuras */
+    .table-modern { width: 100%; margin-bottom: 0; white-space: nowrap; color: var(--pm-text); }
+    .table-modern th { background: var(--pm-bg); text-transform: uppercase; font-family: var(--font-display); font-size: 0.85rem; letter-spacing: 1px; color: var(--pm-text-muted); border-bottom: 1px solid var(--pm-border); padding: 12px 16px; border-top: none;}
+    .table-modern td { vertical-align: middle; border-bottom: 1px solid var(--pm-border); padding: 14px 16px; background: transparent; color: var(--pm-text); }
+    .table-modern tr:hover td { background: rgba(230,168,23,0.03); }
+    
+    /* Badges Suaves */
+    .badge-soft { padding: 5px 10px; font-weight: 600; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display); letter-spacing: 0.5px; text-transform: uppercase; }
+    .badge-soft-success { background: rgba(63,185,80,0.1); color: var(--pm-green); border: 1px solid rgba(63,185,80,0.3); }
+    .badge-soft-danger  { background: rgba(248,81,73,0.1); color: var(--pm-red); border: 1px solid rgba(248,81,73,0.3); }
+    
+    /* Estilos para Modales (Oscuros) */
+    .modal-content { background-color: var(--pm-surface); border: 1px solid var(--pm-border); border-radius: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+    .modal-header { border-bottom: 1px solid var(--pm-border); }
+    .modal-footer { border-top: 1px solid var(--pm-border); }
+    .modal-title { font-family: var(--font-display); color: var(--pm-text); text-transform: uppercase; font-weight: 800; letter-spacing: 1px; }
+    .btn-close { filter: invert(1) grayscale(100%) brightness(200%); opacity: 0.8; }
+    
+    /* Inputs de formulario */
+    .form-control { background-color: var(--pm-bg) !important; border: 1px solid var(--pm-border) !important; color: var(--pm-text) !important; font-family: var(--font-body); padding: 0.6rem 1rem; border-radius: 6px; }
+    .form-control:focus { border-color: var(--pm-amber) !important; box-shadow: 0 0 0 2px rgba(230, 168, 23, 0.15) !important; }
+    .form-label { font-family: var(--font-display); font-weight: 600; color: var(--pm-text-muted); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.4rem; }
 </style>
 
-<div class="container erp-container mb-5" style="margin-top: 100px;">
-    
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb breadcrumb-minimal">
-            <li class="breadcrumb-item"><a href="{% url 'dashboard_erp' %}" class="text-decoration-none text-muted">Dashboard</a></li>
-            <li class="breadcrumb-item active fw-bold text-dark">Gestión de Proyectos</li>
-        </ol>
-    </nav>
+<div class="container-fluid px-3 px-xl-5 erp-container mb-5">
 
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <div class="d-flex align-items-center gap-3">
-            <a href="{% url 'dashboard_erp' %}" class="btn-back d-flex align-items-center gap-2 text-decoration-none">
-                <i class="bi bi-arrow-left"></i> <span class="d-none d-md-inline">Volver</span>
+            <a href="{% url 'dashboard_erp' %}" class="btn btn-outline-secondary text-white border-secondary px-3 transition-2s hover-amber">
+                <i class="bi bi-arrow-left"></i>
             </a>
-            <h4 class="fw-bold mb-0">Proyectos</h4>
+            <div>
+                <h3 class="title-erp mb-0">Centros de <span>Costos</span></h3>
+                <p class="mb-0 text-muted small">Gestión de Proyectos de la Empresa.</p>
+            </div>
         </div>
-        <button class="btn btn-dark rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCrearProyecto">
-            <i class="bi bi-plus-lg me-2"></i> Nuevo Proyecto
+        
+        <button class="btn-amber btn-minimal shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#modalCrearProyecto">
+            <i class="bi bi-plus-lg fs-5"></i> <span class="d-none d-sm-inline">Nuevo Proyecto</span>
         </button>
     </div>
 
-    <div class="card card-minimal overflow-hidden border-0 shadow-sm" style="border-radius: 20px; background: white;">
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show border-0 shadow-sm rounded-3 d-flex align-items-center" role="alert" style="background: var(--pm-surface); border-left: 4px solid var(--pm-amber) !important; color: var(--pm-text);">
+                    <div class="flex-grow-1 fw-medium" style="font-size: 0.95rem;">{{ message }}</div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card card-minimal overflow-hidden">
         <div class="table-responsive">
-            <table class="table align-middle mb-0">
-                <thead class="bg-light">
-                    <tr class="text-secondary small fw-bold">
-                        <th class="px-4 py-3 border-0">NOMBRE / ID</th>
-                        <th class="border-0">ESTADO</th>
-                        <th class="text-end px-4 border-0">ACCIONES</th>
+            <table class="table table-modern mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Nombre del Proyecto</th>
+                        <th>Centro de Costos (Código)</th>
+                        <th>Estado Actual</th>
+                        <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for p in proyectos %}
                     <tr>
-                        <td class="px-4">
-                            <div class="fw-bold text-dark">{{ p.nombre }}</div>
-                            <span class="text-secondary small">{{ p.centro_costos }}</span>
+                        <td class="ps-4">
+                            <div class="fw-bold" style="color: var(--pm-text); font-size: 1.05rem;">{{ p.nombre }}</div>
                         </td>
+                        
+                        <td>
+                            <span class="badge-soft badge-soft-secondary text-white">{{ p.centro_costos }}</span>
+                        </td>
+                        
                         <td>
                             {% if p.is_active %}
-                                <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3">Activo</span>
+                                <span class="badge-soft badge-soft-success"><i class="bi bi-play-circle-fill"></i> Activo (En Curso)</span>
                             {% else %}
-                                <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-3">Inactivo</span>
+                                <span class="badge-soft badge-soft-danger"><i class="bi bi-stop-circle-fill"></i> Archivado</span>
                             {% endif %}
                         </td>
-                        <td class="text-end px-4">
+                        
+                        <td class="text-end pe-4">
                             <div class="d-flex justify-content-end gap-2">
-                                <button class="btn btn-sm btn-light border rounded-circle shadow-sm" 
-                                        data-bs-toggle="modal" data-bs-target="#modalEditar{{ p.id }}" title="Editar">
-                                    <i class="bi bi-pencil"></i>
+                                <button class="btn btn-sm btn-outline-secondary btn-minimal px-2 py-1 text-white border-secondary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ p.id }}" title="Editar Nombre/Código">
+                                    <i class="bi bi-pencil-square"></i>
                                 </button>
-                                <a href="{% url 'alternar_estado_proyecto' p.id %}" 
-                                   class="btn btn-sm {% if p.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} rounded-circle" title="Cambiar Estado">
-                                    <i class="bi bi-power"></i>
+                                
+                                <a href="{% url 'alternar_estado_proyecto' p.id %}" class="btn btn-sm {% if p.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} btn-minimal px-2 py-1 border-0" title="Archivar / Reactivar">
+                                    <i class="bi bi-power fs-5"></i>
                                 </a>
                             </div>
                         </td>
@@ -73,37 +140,76 @@
 
                     <div class="modal fade" id="modalEditar{{ p.id }}" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content border-0 p-3" style="border-radius: 24px;">
-                                <div class="modal-header border-0">
-                                    <h5 class="fw-bold mb-0">Editar Proyecto</h5>
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title"><span style="color: var(--pm-amber);">Editar</span> Proyecto</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
                                 <form action="{% url 'editar_proyecto' p.id %}" method="POST">
                                     {% csrf_token %}
-                                    <div class="modal-body">
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold small text-secondary">Nombre del Proyecto</label>
-                                            <input type="text" name="nombre" value="{{ p.nombre }}" class="form-control rounded-3" required>
+                                    <div class="modal-body p-4">
+                                        <div class="mb-4">
+                                            <label class="form-label">Nombre de la Obra/Proyecto</label>
+                                            <input type="text" name="nombre" value="{{ p.nombre }}" class="form-control" required placeholder="Ej: Edificio Corporativo Zona 4">
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold small text-secondary">Centro de Costos</label>
-                                            <input type="text" name="centro_costos" value="{{ p.centro_costos }}" class="form-control rounded-3" required>
+                                        <div class="mb-2">
+                                            <label class="form-label">Código Centro de Costos</label>
+                                            <input type="text" name="centro_costos" value="{{ p.centro_costos }}" class="form-control" required placeholder="Ej: PRJ-001">
                                         </div>
                                     </div>
-                                    <div class="modal-footer border-0">
-                                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-dark rounded-pill px-4 shadow">Actualizar</button>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-outline-secondary btn-minimal border-secondary text-white" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-amber btn-minimal">Guardar Cambios</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     </div>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5">
+                            <i class="bi bi-building text-muted" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3 text-white" style="font-family: var(--font-display);">Sin Proyectos</h5>
+                            <p class="text-muted small mb-4">Aún no hay centros de costo registrados en la empresa.</p>
+                            <button class="btn-amber btn-minimal px-4 py-2" data-bs-toggle="modal" data-bs-target="#modalCrearProyecto">
+                                <i class="bi bi-plus-lg"></i> Crear Primer Proyecto
+                            </button>
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-</div>
+    
+    <div class="modal fade" id="modalCrearProyecto" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><span style="color: var(--pm-amber);">Nuevo</span> Proyecto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{% url 'gestionar_proyectos' %}" method="POST">
+                    {% csrf_token %}
+                    <div class="modal-body p-4">
+                        <div class="mb-4">
+                            <label class="form-label">Nombre de la Obra/Proyecto <span class="text-danger">*</span></label>
+                            <input type="text" name="nombre" class="form-control" required placeholder="Ej: Galpón Industrial Sur">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Código Centro de Costos <span class="text-danger">*</span></label>
+                            <input type="text" name="centro_costos" class="form-control" required placeholder="Ej: PRJ-002">
+                            <div class="form-text text-muted mt-2" style="font-size: 0.8rem;"><i class="bi bi-info-circle"></i> Este código se usará en reportes contables.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-minimal border-secondary text-white" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" name="crear_proyecto" class="btn btn-amber btn-minimal">Crear Proyecto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-...
+</div>
 {% endblock %}

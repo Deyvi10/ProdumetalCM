@@ -8,17 +8,16 @@
 {% block content %}
 <style>
     /* =========================================
-       ESTILOS PREMIUM INDUSTRIAL (Dark Mode / Mobile-First)
+       DASHBOARD - ESTILO PREMIUM MINIMALISTA
        ========================================= */
     :root {
         --pm-bg: #0d1117;
         --pm-surface: #161b22;
         --pm-surface-hover: #1c2128;
         --pm-border: #30363d;
-        --pm-text: #ffffff; /* Blanco puro para texto principal (Antes era ligeramente azulado) */
-        --pm-text-muted: #aab6c4; /* Gris Plateado Claro / Luminoso (Adiós al plomo oscuro) */
+        --pm-text: #ffffff;
+        --pm-text-muted: #aab6c4;
         
-        /* Colores de Estado (Alto contraste en fondo oscuro) */
         --pm-amber: #e6a817; 
         --pm-blue: #58a6ff;
         --pm-green: #3fb950;
@@ -34,31 +33,23 @@
         font-family: var(--font-body);
     }
 
-    /* ¡ESTA ES LA MAGIA QUE ARREGLA EL PROBLEMA! 
-       Forzamos a Bootstrap a usar nuestro Gris Plateado luminoso en lugar de su plomo oscuro */
     .text-muted, .text-secondary {
         color: var(--pm-text-muted) !important;
     }
 
-    .erp-container { 
-        margin-top: 30px; 
-        max-width: 1400px; 
-    }
+    .erp-container { margin-top: 30px; max-width: 1400px; }
     
-    /* Responsive Adjustments */
     @media (max-width: 768px) {
         .erp-container { margin-top: 15px; padding-left: 15px !important; padding-right: 15px !important; }
-        .btn-mobile-full { width: 100%; margin-bottom: 8px; justify-content: center; }
-        .dashboard-banner { text-align: center; }
-        .dashboard-banner .d-flex.align-items-center { flex-direction: column; gap: 15px !important; }
-        .action-card-grid { grid-template-columns: 1fr 1fr; } /* 2 columnas en celular */
+        .dashboard-banner .d-flex { flex-direction: column; gap: 10px; text-align: center; }
+        .action-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     }
 
     @media (min-width: 769px) {
-        .action-card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+        .action-card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
     }
-    
-    /* Banner Principal */
+
+    /* Banner Principal - Ahora más limpio y enfocado */
     .dashboard-banner {
         background: linear-gradient(135deg, var(--pm-surface) 0%, var(--pm-bg) 100%);
         border: 1px solid var(--pm-border);
@@ -67,120 +58,64 @@
     }
     
     .company-logo-dashboard {
-        width: 70px; height: 70px;
-        object-fit: cover;
-        border: 2px solid var(--pm-amber);
-        background-color: var(--pm-bg);
-        padding: 3px;
+        width: 70px; height: 70px; object-fit: cover;
+        border: 2px solid var(--pm-amber); background-color: var(--pm-bg); padding: 3px;
     }
 
     .title-erp { font-family: var(--font-display); font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
     .title-erp span { color: var(--pm-amber); }
 
-    /* Tarjetas Minimalistas */
-    .card-minimal {
-        background: var(--pm-surface);
-        border: 1px solid var(--pm-border);
-        border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    }
-    .card-header-custom {
-        background: transparent;
-        border-bottom: 1px solid var(--pm-border);
-        padding: 1.2rem 1.5rem;
-    }
-    .card-header-custom h6 {
-        font-family: var(--font-display);
-        font-size: 1.1rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin: 0;
-        color: var(--pm-text);
-    }
-
-    /* Action Cards (Bodeguero) */
+    /* Tarjetas de Módulos (Panel de Mando) */
     .action-card {
-        background: var(--pm-surface);
-        border: 1px solid var(--pm-border);
-        border-radius: 10px;
-        padding: 1.5rem 1rem;
-        text-align: center;
-        transition: all 0.2s ease;
-        text-decoration: none;
-        color: var(--pm-text);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        height: 100%;
+        background: var(--pm-surface); border: 1px solid var(--pm-border); border-radius: 12px; padding: 1.5rem 1rem;
+        text-align: center; transition: all 0.3s ease; text-decoration: none; color: var(--pm-text);
+        display: flex; flex-direction: column; align-items: center; height: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     .action-card:hover {
-        border-color: var(--pm-amber);
-        background: var(--pm-surface-hover);
-        transform: translateY(-3px);
-        color: var(--pm-text);
+        border-color: var(--pm-amber); background: var(--pm-surface-hover); transform: translateY(-5px); color: var(--pm-text); box-shadow: 0 8px 24px rgba(230,168,23,0.15);
     }
-    .action-icon { font-size: 2rem; margin-bottom: 0.5rem; color: var(--pm-amber); }
-    .action-card h6 { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; margin: 0; letter-spacing: 0.5px; }
+    .action-icon { font-size: 2.2rem; margin-bottom: 0.8rem; color: var(--pm-amber); }
+    .action-card h6 { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; margin: 0; letter-spacing: 0.5px; font-size: 1.1rem; }
+
+    /* Paneles de Tablas */
+    .card-minimal { background: var(--pm-surface); border: 1px solid var(--pm-border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    .card-header-custom { background: transparent; border-bottom: 1px solid var(--pm-border); padding: 1.2rem 1.5rem; }
+    .card-header-custom h6 { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0; color: var(--pm-text); }
 
     /* Tablas Modernas Oscuras */
-    .table-responsive { -webkit-overflow-scrolling: touch; }
     .table-modern { width: 100%; margin-bottom: 0; white-space: nowrap; color: var(--pm-text); }
-    .table-modern th {
-        background: var(--pm-bg);
-        text-transform: uppercase;
-        font-family: var(--font-display);
-        font-size: 0.85rem;
-        letter-spacing: 1px;
-        color: var(--pm-text-muted);
-        border-bottom: 1px solid var(--pm-border);
-        padding: 12px 16px;
-    }
-    .table-modern td {
-        vertical-align: middle;
-        border-bottom: 1px solid var(--pm-border);
-        padding: 14px 16px;
-        background: transparent;
-        color: var(--pm-text);
-    }
+    .table-modern th { background: var(--pm-bg); text-transform: uppercase; font-family: var(--font-display); font-size: 0.85rem; letter-spacing: 1px; color: var(--pm-text-muted); border-bottom: 1px solid var(--pm-border); padding: 12px 16px; border-top: none;}
+    .table-modern td { vertical-align: middle; border-bottom: 1px solid var(--pm-border); padding: 14px 16px; background: transparent; color: var(--pm-text); }
     .table-modern tr:hover td { background: rgba(230,168,23,0.03); }
     
-    /* Badges Soft Oscuros */
-    .badge-soft {
-        padding: 5px 10px; font-weight: 600; font-size: 0.75rem; border-radius: 4px;
-        display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display); letter-spacing: 0.5px; text-transform: uppercase;
-    }
+    /* Badges de Estado */
+    .badge-soft { padding: 5px 10px; font-weight: 600; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display); letter-spacing: 0.5px; text-transform: uppercase; }
     .badge-soft-warning { background: rgba(230,168,23,0.1); color: var(--pm-amber); border: 1px solid rgba(230,168,23,0.3); }
     .badge-soft-success { background: rgba(63,185,80,0.1); color: var(--pm-green); border: 1px solid rgba(63,185,80,0.3); }
     .badge-soft-danger  { background: rgba(248,81,73,0.1); color: var(--pm-red); border: 1px solid rgba(248,81,73,0.3); }
     .badge-soft-info    { background: rgba(88,166,255,0.1); color: var(--pm-blue); border: 1px solid rgba(88,166,255,0.3); }
-    .badge-soft-secondary { background: rgba(219, 224, 230, 0.1); color: var(--pm-text-muted); border: 1px solid rgba(139,148,158,0.3); }
+    .badge-soft-secondary { background: rgba(139,148,158,0.1); color: var(--pm-text-muted); border: 1px solid rgba(139,148,158,0.3); }
 
-    /* Línea de tiempo */
+    /* Timeline de Auditoría */
     .timeline-item { position: relative; padding-left: 28px; padding-bottom: 1.2rem; border-left: 2px solid var(--pm-border); margin-left: 10px; }
     .timeline-item:last-child { border-left-color: transparent; }
     .timeline-icon { position: absolute; left: -11px; top: 0; background: var(--pm-surface); border-radius: 50%; padding: 2px; }
 
-    /* Botones y Outline */
-    .btn-minimal {
-        font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
-        border-radius: 4px; padding: 0.5rem 1rem; transition: 0.2s;
-    }
-    .btn-outline-amber { color: var(--pm-amber); border: 1px solid var(--pm-amber); background: transparent; }
-    .btn-outline-amber:hover { background: var(--pm-amber); color: #000; }
-    .btn-amber { background: var(--pm-amber); color: #000; border: none; }
-    .btn-amber:hover { background: #ffd166; color: #000; }
+    /* Estilos del botón de salir */
+    .btn-logout { font-family: var(--font-display); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; border-radius: 20px; font-size: 0.75rem; border: 1px solid var(--pm-border); color: var(--pm-text-muted); padding: 0.4rem 1rem; transition: 0.2s; text-decoration: none;}
+    .btn-logout:hover { border-color: var(--pm-red); color: var(--pm-red); background: rgba(248,81,73,0.05); }
 </style>
 
 <div class="container-fluid px-3 px-xl-5 erp-container mb-5">
     
     <div class="dashboard-banner p-3 p-md-4 mb-4 shadow">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+            
             <div class="d-flex align-items-center gap-3">
                 <img src="{% static 'web/img/logo.jpg' %}" alt="Logo ProduMetal" class="rounded-circle company-logo-dashboard shadow-sm">
-                <div>
+                <div class="text-center text-md-start">
                     <h3 class="title-erp mb-1">ProduMetal <span>ERP</span></h3>
-                    <p class="mb-0 text-muted" style="font-size: 0.9rem;">
+                    <p class="mb-0 text-muted" style="font-size: 0.95rem;">
                         Hola, <span class="fw-bold text-white">{{ request.user.first_name|default:request.user.username }}</span> 
                         <span class="d-none d-md-inline mx-2">|</span>
                         <span class="badge-soft badge-soft-secondary mt-2 mt-md-0">
@@ -190,15 +125,15 @@
                 </div>
             </div>
             
-            <div class="w-100 w-md-auto d-flex flex-column flex-md-row gap-2 mt-2 mt-md-0">
-                {% if rol == 'Administrador' %}
-                    <a href="{% url 'gestionar_proyectos' %}" class="btn btn-outline-amber btn-minimal btn-mobile-full"><i class="bi bi-building"></i> Proyectos</a>
-                    <a href="{% url 'gestionar_empleados' %}" class="btn btn-outline-amber btn-minimal btn-mobile-full"><i class="bi bi-people"></i> Personal</a>
-                    <a href="{% url 'gestionar_bloqueos' %}" class="btn btn-outline-secondary btn-minimal btn-mobile-full text-white"><i class="bi bi-shield-lock"></i> Seguridad</a>
-                {% elif rol == 'Solicitante' %}
-                    <a href="{% url 'crear_requerimiento' %}" class="btn btn-amber btn-minimal btn-mobile-full"><i class="bi bi-plus-lg"></i> Nuevo Ticket</a>
-                {% endif %}
+            <div class="text-center text-md-end mt-2 mt-md-0">
+                <div class="text-muted small fw-bold text-uppercase mb-2" style="letter-spacing: 1px;">
+                    <i class="bi bi-calendar-event me-1 text-white"></i> {% now "d \d\e F, Y" %}
+                </div>
+                <a href="{% url 'logout' %}" class="btn-logout d-inline-flex align-items-center">
+                    <i class="bi bi-power me-1"></i> Cerrar Sesión
+                </a>
             </div>
+
         </div>
     </div>
 
@@ -209,14 +144,39 @@
                     {% if message.tags == 'success' %}<i class="bi bi-check-circle-fill text-success fs-5 me-3"></i>{% endif %}
                     {% if message.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill text-warning fs-5 me-3"></i>{% endif %}
                     {% if message.tags == 'danger' %}<i class="bi bi-shield-fill-x text-danger fs-5 me-3"></i>{% endif %}
-                    <div class="flex-grow-1 fw-medium" style="font-size: 0.9rem;">{{ message }}</div>
+                    <div class="flex-grow-1 fw-medium" style="font-size: 0.95rem;">{{ message }}</div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
                 </div>
             {% endfor %}
         </div>
     {% endif %}
 
+
     {% if rol == 'Administrador' %}
+    
+    <div class="action-card-grid mb-4">
+        <a href="{% url 'inventario_actual' %}" class="action-card" style="border-bottom: 3px solid var(--pm-amber);">
+            <div class="action-icon"><i class="bi bi-box-seam"></i></div>
+            <h6>Inventario & Auditoría</h6>
+            <p class="small text-muted mt-2 mb-0">Revisar stock y aplicar ajustes</p>
+        </a>
+        <a href="{% url 'gestionar_proyectos' %}" class="action-card">
+            <div class="action-icon"><i class="bi bi-building"></i></div>
+            <h6>Centros de Costo</h6>
+            <p class="small text-muted mt-2 mb-0">Proyectos activos de la empresa</p>
+        </a>
+        <a href="{% url 'gestionar_empleados' %}" class="action-card">
+            <div class="action-icon"><i class="bi bi-people"></i></div>
+            <h6>Personal</h6>
+            <p class="small text-muted mt-2 mb-0">Gestionar usuarios y roles</p>
+        </a>
+        <a href="{% url 'gestionar_bloqueos' %}" class="action-card" style="border-bottom: 3px solid var(--pm-red);">
+            <div class="action-icon"><i class="bi bi-shield-lock"></i></div>
+            <h6>Seguridad</h6>
+            <p class="small text-muted mt-2 mb-0">Desbloqueo de cuentas</p>
+        </a>
+    </div>
+
     <div class="row g-4">
         <div class="col-12 col-lg-8">
             <div class="card card-minimal h-100">
@@ -283,15 +243,17 @@
                             <div class="timeline-icon">
                                 {% if mov.tipo == 'INGRESO' %}
                                     <i class="bi bi-arrow-down-circle-fill text-success fs-5"></i>
-                                {% else %}
+                                {% elif mov.tipo == 'SALIDA' %}
                                     <i class="bi bi-arrow-up-right-circle-fill text-warning fs-5"></i>
+                                {% else %}
+                                    <i class="bi bi-exclamation-circle-fill text-danger fs-5"></i>
                                 {% endif %}
                             </div>
                             <div>
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <span class="fw-bold small">{{ mov.material.sku }}</span>
-                                    <span class="fw-bold {% if mov.tipo == 'INGRESO' %}text-success{% else %}text-warning{% endif %} small">
-                                        {% if mov.tipo == 'INGRESO' %}+{% else %}-{% endif %}{{ mov.cantidad }}
+                                    <span class="fw-bold {% if mov.tipo == 'INGRESO' %}text-success{% elif mov.tipo == 'SALIDA' %}text-warning{% else %}text-danger{% endif %} small">
+                                        {% if mov.cantidad > 0 %}+{% endif %}{{ mov.cantidad }}
                                     </span>
                                 </div>
                                 <div class="text-muted small">Por: {{ mov.responsable.username }}</div>
@@ -315,21 +277,25 @@
     {% if rol == 'Bodeguero' %}
     
     <div class="action-card-grid mb-4">
-        <a href="{% url 'inventario_actual' %}" class="action-card">
+        <a href="{% url 'inventario_actual' %}" class="action-card" style="border-bottom: 3px solid var(--pm-amber);">
             <div class="action-icon"><i class="bi bi-box-seam"></i></div>
             <h6>Inventario</h6>
+            <p class="small text-muted mt-2 mb-0">Consultar Stock General</p>
         </a>
         <a href="{% url 'crear_material' %}" class="action-card">
             <div class="action-icon"><i class="bi bi-plus-square"></i></div>
-            <h6>Nuevo Material</h6>
+            <h6>Catálogo</h6>
+            <p class="small text-muted mt-2 mb-0">Registrar un Nuevo Ítem</p>
         </a>
         <a href="{% url 'crear_orden_compra' %}" class="action-card">
             <div class="action-icon"><i class="bi bi-cart-plus"></i></div>
             <h6>Comprar</h6>
+            <p class="small text-muted mt-2 mb-0">Generar Orden a Proveedor</p>
         </a>
-        <a href="{% url 'listar_ordenes_compra' %}" class="action-card">
+        <a href="{% url 'listar_ordenes_compra' %}" class="action-card" style="border-bottom: 3px solid var(--pm-green);">
             <div class="action-icon"><i class="bi bi-truck"></i></div>
-            <h6>Recibir OC</h6>
+            <h6>Recibir Stock</h6>
+            <p class="small text-muted mt-2 mb-0">Ingresar Material a Bodega</p>
         </a>
     </div>
 
@@ -386,8 +352,8 @@
                                     <td class="fw-semibold">{{ req.proyecto.nombre }}</td>
                                     <td class="text-muted small">{{ req.fecha_solicitud|date:"d M, Y" }}</td>
                                     <td class="text-end">
-                                        <a href="{% url 'imprimir_pdf_ticket' req.id %}" target="_blank" class="btn btn-sm btn-outline-danger btn-minimal px-2 py-1 me-2"><i class="bi bi-filetype-pdf"></i> PDF</a>
-                                        <button class="btn btn-sm btn-outline-info btn-minimal px-3">Despachar <i class="bi bi-arrow-right"></i></button>
+                                        <a href="{% url 'imprimir_pdf_ticket' req.id %}" target="_blank" class="btn btn-sm btn-outline-danger px-2 py-1 me-2" style="border-radius: 4px;"><i class="bi bi-filetype-pdf"></i> PDF</a>
+                                        <button class="btn btn-sm btn-outline-info px-3" style="border-radius: 4px; font-family: var(--font-display); font-weight: bold; text-transform: uppercase;">Despachar <i class="bi bi-arrow-right"></i></button>
                                     </td>
                                 </tr>
                                 {% empty %}
@@ -409,6 +375,15 @@
 
 
     {% if rol == 'Solicitante' %}
+    
+    <div class="action-card-grid mb-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 250px));">
+        <a href="{% url 'crear_requerimiento' %}" class="action-card" style="border-bottom: 3px solid var(--pm-blue);">
+            <div class="action-icon text-primary"><i class="bi bi-ticket-detailed"></i></div>
+            <h6>Nuevo Ticket</h6>
+            <p class="small text-muted mt-2 mb-0">Solicitar materiales a bodega</p>
+        </a>
+    </div>
+
     <div class="card card-minimal">
         <div class="card-header-custom">
             <h6><i class="bi bi-clock-history text-primary me-2"></i> Mis Requerimientos Históricos</h6>
@@ -445,9 +420,9 @@
                             </td>
                             <td class="text-end">
                                 {% if req.estado == 'APROBADO' or req.estado == 'DESPACHADO' %}
-                                    <a href="{% url 'imprimir_pdf_ticket' req.id %}" target="_blank" class="btn btn-sm btn-outline-danger btn-minimal px-2 py-1 me-2"><i class="bi bi-file-pdf"></i></a>
+                                    <a href="{% url 'imprimir_pdf_ticket' req.id %}" target="_blank" class="btn btn-sm btn-outline-danger px-2 py-1 me-2" style="border-radius: 4px;"><i class="bi bi-file-pdf"></i></a>
                                 {% endif %}
-                                <a href="{% url 'añadir_materiales' req.id %}" class="btn btn-sm btn-outline-secondary btn-minimal px-3 text-white border-secondary">
+                                <a href="{% url 'añadir_materiales' req.id %}" class="btn btn-sm btn-outline-secondary text-white border-secondary px-3" style="border-radius: 4px;">
                                     <i class="bi bi-eye"></i> <span class="d-none d-md-inline ms-1">Ver</span>
                                 </a>
                             </td>

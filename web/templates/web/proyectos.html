@@ -1,46 +1,156 @@
 {% extends 'web/base.html' %}
 {% load static %}
 
-{% block content %}
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+{% endblock %}
 
-<div class="bg-dark py-5 text-center text-white mb-5">
+{% block content %}
+<style>
+    /* =========================================
+       PORTAFOLIO PÚBLICO - ESTILO PREMIUM 
+       ========================================= */
+    :root {
+        --pm-bg: #0d1117;
+        --pm-surface: #161b22;
+        --pm-border: #30363d;
+        --pm-text: #ffffff;
+        --pm-text-muted: #aab6c4;
+        --pm-amber: #e6a817; 
+        --pm-red: #f85149;
+        --font-display: 'Barlow Condensed', sans-serif;
+        --font-body: 'Barlow', sans-serif;
+    }
+
+    body { background-color: var(--pm-bg) !important; color: var(--pm-text) !important; font-family: var(--font-body); }
+    
+    /* Banner Header */
+    .portfolio-header {
+        background: linear-gradient(to bottom, rgba(13,17,23,0.8), var(--pm-bg)), url('{% static "web/img/bg-proyectos.jpg" %}') center/cover;
+        padding: 6rem 0 4rem 0;
+        border-bottom: 1px solid var(--pm-border);
+    }
+    .portfolio-title { font-family: var(--font-display); font-weight: 800; font-size: 3.5rem; text-transform: uppercase; letter-spacing: 1px; }
+    .portfolio-title span { color: var(--pm-amber); }
+    .separator-line { width: 80px; height: 4px; background-color: var(--pm-amber); margin: 20px auto; border-radius: 2px; }
+
+    /* Tarjetas de Proyecto */
+    .card-portfolio {
+        background: var(--pm-surface); border: 1px solid var(--pm-border); border-radius: 12px;
+        overflow: hidden; transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        position: relative;
+    }
+    .card-portfolio:hover {
+        transform: translateY(-10px); border-color: var(--pm-amber);
+        box-shadow: 0 15px 30px rgba(230,168,23,0.15);
+    }
+    
+    /* Imagen con zoom suave */
+    .img-wrapper { overflow: hidden; position: relative; border-bottom: 2px solid var(--pm-amber); }
+    .portfolio-img {
+        height: 300px; width: 100%; object-fit: cover;
+        transition: transform 0.6s ease;
+    }
+    .card-portfolio:hover .portfolio-img { transform: scale(1.08); }
+
+    /* Contenido de la tarjeta */
+    .card-body-portfolio { padding: 2rem 1.5rem; text-align: center; }
+    .badge-categoria {
+        background: rgba(230,168,23,0.1); color: var(--pm-amber); border: 1px solid rgba(230,168,23,0.3);
+        font-family: var(--font-display); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
+        padding: 0.4rem 1rem; border-radius: 4px; letter-spacing: 0.5px; margin-bottom: 1rem; display: inline-block;
+    }
+    .proyecto-titulo { font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; color: var(--pm-text); text-transform: uppercase; }
+    
+    /* Botón Ver Proyecto */
+    .btn-outline-amber {
+        color: var(--pm-amber); border: 1px solid var(--pm-amber); background: transparent;
+        font-family: var(--font-display); text-transform: uppercase; font-weight: 700; letter-spacing: 1px;
+        border-radius: 4px; padding: 0.6rem 1.5rem; transition: 0.3s; text-decoration: none; width: 100%; display: inline-block;
+    }
+    .btn-outline-amber:hover { background: var(--pm-amber); color: #000; }
+
+    /* CONTROLES EXCLUSIVOS DEL ADMINISTRADOR */
+    .admin-controls {
+        position: absolute; top: 15px; right: 15px; z-index: 10;
+        background: rgba(13,17,23,0.85); backdrop-filter: blur(5px);
+        padding: 5px; border-radius: 8px; border: 1px solid var(--pm-border);
+        display: flex; gap: 5px; opacity: 0.8; transition: 0.3s;
+    }
+    .card-portfolio:hover .admin-controls { opacity: 1; }
+    .btn-admin-del {
+        background: transparent; color: var(--pm-red); border: 1px solid var(--pm-red);
+        padding: 5px 10px; border-radius: 4px; transition: 0.2s; cursor: pointer;
+    }
+    .btn-admin-del:hover { background: var(--pm-red); color: white; }
+</style>
+
+<div class="portfolio-header text-center mb-5">
     <div class="container" data-aos="fade-down">
-        <h2 class="display-4 fw-bold text-uppercase text-warning">Nuestros Proyectos</h2>
-        <p class="lead text-white-50">Ingeniería y precisión en cada estructura</p>
-        <div style="width: 80px; height: 4px; background-color: #ffc107; margin: 20px auto;"></div>
+        <h2 class="portfolio-title">Nuestros <span>Proyectos</span></h2>
+        <p class="lead" style="color: var(--pm-text-muted);">Ingeniería, precisión y solidez en cada estructura desarrollada.</p>
+        <div class="separator-line"></div>
     </div>
 </div>
 
 <div class="container py-4 mb-5">
-    <div class="row g-4">
-        {% for p in proyectos %}
-        <div class="col-md-6 col-lg-6" data-aos="fade-up" data-aos-delay="100">
-            <div class="card h-100 shadow border-0 overflow-hidden hover-top">
-                
-                <a href="{% url 'detalle_proyecto' p.id %}">
-                    <div style="overflow: hidden;">
-                        <img src="{% static 'web/img/'|add:p.img %}" 
-                             onerror="this.src='https://via.placeholder.com/600x400?text={{ p.titulo }}'"
-                             class="card-img-top w-100" alt="{{ p.titulo }}" 
-                             style="height: 350px; object-fit: cover; transition: transform 0.5s ease;"
-                             onmouseover="this.style.transform='scale(1.05)'" 
-                             onmouseout="this.style.transform='scale(1)'">
+
+    {% if messages %}
+        <div class="row mb-4">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} border-0 shadow-sm rounded-3 d-flex align-items-center" style="background: var(--pm-surface); border-left: 4px solid var(--pm-amber) !important; color: var(--pm-text);">
+                        <i class="bi bi-info-circle-fill me-3" style="color: var(--pm-amber);"></i>
+                        <div class="flex-grow-1 fw-medium">{{ message }}</div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
                     </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row g-4 g-lg-5">
+        {% for p in proyectos %}
+        <div class="col-12 col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:1 }}00">
+            <div class="card-portfolio h-100 d-flex flex-column">
+                
+                {% if request.user.is_authenticated and request.user.is_staff %}
+                <div class="admin-controls">
+                    <form action="{% url 'eliminar_proyecto_publico' p.id %}" method="POST" style="margin: 0;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-admin-del" title="Eliminar Proyecto Público" onclick="return confirm('ADMINISTRADOR: ¿Estás totalmente seguro de que deseas eliminar permanentemente el proyecto público «{{ p.titulo }}» de la web? Esta acción no se puede deshacer.');">
+                            <i class="bi bi-trash-fill"></i>
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <a href="{% url 'detalle_proyecto' p.id %}" class="img-wrapper d-block">
+                    <img src="{% static 'web/img/'|add:p.img %}" 
+                         onerror="this.src='https://via.placeholder.com/600x400/161b22/e6a817?text={{ p.titulo }}'"
+                         class="portfolio-img" alt="{{ p.titulo }}">
                 </a>
                 
-                <div class="card-body text-center p-4">
-                    <div class="badge bg-warning text-dark mb-3 px-3 py-2 rounded-pill">{{ p.categoria }}</div>
-                    <h4 class="card-title fw-bold text-dark">{{ p.titulo }}</h4>
+                <div class="card-body-portfolio flex-grow-1 d-flex flex-column justify-content-center">
+                    <div>
+                        <span class="badge-categoria">{{ p.categoria }}</span>
+                        <h4 class="proyecto-titulo">{{ p.titulo }}</h4>
+                    </div>
                 </div>
                 
-                <div class="card-footer bg-white border-0 pb-4 px-4 text-center">
-                    <a href="{% url 'detalle_proyecto' p.id %}" class="btn btn-dark w-100 fw-bold rounded-pill">Ver Proyecto Completo</a>
+                <div class="px-4 pb-4 mt-auto">
+                    <a href="{% url 'detalle_proyecto' p.id %}" class="btn-outline-amber text-center">
+                        Explorar Proyecto <i class="bi bi-arrow-right ms-2"></i>
+                    </a>
                 </div>
+
             </div>
         </div>
         {% empty %}
         <div class="col-12 text-center py-5">
-            <h4 class="text-muted">No hay proyectos cargados aún.</h4>
+            <i class="bi bi-building-slash mb-3" style="font-size: 4rem; color: var(--pm-border);"></i>
+            <h4 class="portfolio-title text-muted" style="font-size: 2rem;">Portafolio en Construcción</h4>
+            <p style="color: var(--pm-text-muted);">Pronto publicaremos nuestros últimos trabajos estructurales.</p>
         </div>
         {% endfor %}
     </div>
