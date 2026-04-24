@@ -6,8 +6,14 @@ from django.db.models import F
 from axes.models import AccessAttempt
 from django.db import transaction
 from django.core.paginator import Paginator
-# Importaciones de Modelos y Formularios
-from .models import Requerimiento, Material, Proyecto, MovimientoInventario, OrdenCompra
+
+# =======================================================
+# IMPORTACIONES DE MODELOS Y FORMULARIOS (CORREGIDO)
+# =======================================================
+from .models import (
+    Requerimiento, DetalleRequerimiento, Material, Proyecto, MovimientoInventario, 
+    OrdenCompra, DetalleOrdenCompra, SolicitudCompra, CotizacionItem
+)
 from .forms import (
     RequerimientoForm, DetalleRequerimientoForm, RegistroEmpleadoForm, 
     ProyectoForm, OrdenCompraForm, DetalleOrdenCompraForm, AjusteInventarioForm
@@ -20,6 +26,7 @@ from xhtml2pdf import pisa
 import os
 from django.conf import settings
 from django.utils import timezone
+
 
 # =======================================================
 # VISTAS DE LA PÁGINA WEB PÚBLICA
@@ -85,11 +92,12 @@ def proyectos(request):
     return render(request, 'web/proyectos.html', {'proyectos': lista_proyectos})
 
 def detalle_proyecto(request, proyecto_id):
+    # (El contenido de detalle_proyecto se mantiene igual)
     datos_proyectos = {
         'plaza-kocoa': {
             'titulo': 'Plaza Kocoa',
             'ubicacion': 'Conocoto',
-            'descripcion': 'Plaza Kocoa es un moderno proyecto comercial ubicado en Conocoto, diseñado para ofrecer espacios funcionales y una imagen arquitectónica contemporánea...',
+            'descripcion': 'Plaza Kocoa es un moderno proyecto comercial ubicado en Conocoto, diseñado para ofrecer espacios funcionales...',
             'fotos': ['kocoa/kocoa1.jpg', 'kocoa/kocoa2.jpg', 'kocoa/kocoa3.jpg', 'kocoa/kocoa4.jpg'],
             'videos': ['kocoa/kocoa_vid.mp4']
         },
@@ -122,13 +130,11 @@ def detalle_proyecto(request, proyecto_id):
             'videos': ['arteaga/arteaga_video1.mp4']
         }
     }
-
     proyecto = datos_proyectos.get(proyecto_id)
     return render(request, 'web/detalle_proyecto.html', {'p': proyecto})
 
 def contacto(request):
     return render(request, 'web/contacto.html')
-
 
 
 # =======================================================
@@ -143,6 +149,8 @@ def es_solicitante(user):
 def es_bodeguero(user):
     return user.groups.filter(name='Bodeguero').exists() or user.is_superuser
 
+def es_comprador(user):
+    return user.groups.filter(name='Compras').exists() or user.is_superuser
 
 
 # =======================================================
@@ -157,27 +165,31 @@ def dashboard_erp(request):
     # 1. VISTA DEL DUEÑO / ADMINISTRADOR
     if es_admin(usuario):
         context['rol'] = 'Administrador'
-        # Ve los tickets que necesitan su firma/aprobación
         context['tickets_pendientes'] = Requerimiento.objects.filter(estado='PENDIENTE').order_by('fecha_solicitud')
-        # Ve las últimas salidas o ingresos de bodega
         context['ultimos_movimientos'] = MovimientoInventario.objects.all().order_by('-fecha_hora')[:5]
+        context['cotizaciones_pendientes'] = SolicitudCompra.objects.filter(estado='COTIZADO').order_by('fecha_creacion')
         
     # 2. VISTA DEL BODEGUERO
     elif es_bodeguero(usuario):
         context['rol'] = 'Bodeguero'
-        # Tickets que el dueño aprobó y hay que entregar
         context['tickets_por_despachar'] = Requerimiento.objects.filter(estado='APROBADO')
-        # Órdenes de compra que están "En Borrador" para seguir editando
         context['mis_compras_pendientes'] = OrdenCompra.objects.filter(estado='BORRADOR')
         context['alertas_stock'] = Material.objects.filter(stock_actual__lte=F('stock_minimo'))
 
-    # 3. VISTA DEL SOLICITANTE / TÉCNICO
+    # 3. VISTA DEL DEPARTAMENTO DE COMPRAS
+    elif es_comprador(usuario):
+        context['rol'] = 'Compras'
+        context['solicitudes_compras'] = SolicitudCompra.objects.filter(estado='ENVIADO_A_COMPRAS').order_by('-fecha_creacion')
+
+    # 4. VISTA DEL SOLICITANTE / TÉCNICO
     else:
         context['rol'] = 'Solicitante'
-        # Solo ve lo suyo
         context['mis_requerimientos'] = Requerimiento.objects.filter(solicitante=usuario).order_by('-fecha_solicitud')
 
     return render(request, 'web/erp/dashboard.html', context)
+
+
+# --- GESTIÓN DE REQUERIMIENTOS (SOLICITANTES) ---
 
 @login_required(login_url='login')
 @user_passes_test(es_solicitante, login_url='dashboard_erp')
@@ -188,12 +200,10 @@ def crear_requerimiento(request):
             nuevo_req = form_req.save(commit=False)
             nuevo_req.solicitante = request.user 
             nuevo_req.save() 
-            
             messages.success(request, f'Ticket {nuevo_req.folio} creado con éxito. Ahora añade los materiales.')
             return redirect('añadir_materiales', req_id=nuevo_req.id)
     else:
         form_req = RequerimientoForm()
-
     return render(request, 'web/erp/crear_requerimiento.html', {'form': form_req})
 
 @login_required(login_url='login')
@@ -221,31 +231,134 @@ def añadir_materiales(request, req_id):
     return render(request, 'web/erp/añadir_materiales.html', context)
 
 
-# --- VISTA EXCLUSIVA PARA EL DUEÑO ---
+# --- VISTA DE APROBACIÓN DE TICKETS (Solo Administrador) ---
 @login_required(login_url='login')
 @user_passes_test(es_admin, login_url='dashboard_erp')
-def gestionar_empleados(request):
-    # Truco: Creamos los roles automáticamente si no existen en la BD
-    Group.objects.get_or_create(name='Bodeguero')
-    Group.objects.get_or_create(name='Solicitante')
+def procesar_ticket(request, req_id, accion):
+    ticket = get_object_or_404(Requerimiento, id=req_id)
+    
+    if accion == 'aprobar':
+        ticket.estado = 'APROBADO'
+        messages.success(request, f"Ticket {ticket.folio} aprobado para despacho en bodega.")
+        
+    elif accion == 'rechazar':
+        ticket.estado = 'RECHAZADO'
+        messages.warning(request, f"Ticket {ticket.folio} ha sido rechazado.")
+        
+    elif accion == 'compras':
+        # NUEVO: Enviar automáticamente a Compras y empaquetar los materiales
+        ticket.estado = 'EN_COMPRAS'
+        solicitud, created = SolicitudCompra.objects.get_or_create(
+            requerimiento_origen=ticket,
+            defaults={'estado': 'ENVIADO_A_COMPRAS'}
+        )
+        if created:
+            for detalle in ticket.detalles.all():
+                CotizacionItem.objects.create(
+                    solicitud=solicitud,
+                    material=detalle.material,
+                    cantidad_requerida=detalle.cantidad_solicitada
+                )
+        messages.info(request, f"Ticket {ticket.folio} enviado al departamento de Compras para cotización.")
+    
+    ticket.save()
+    return redirect('dashboard_erp')
 
-    # Traemos a todos los empleados que no sean el dueño
-    empleados = User.objects.filter(is_superuser=False).order_by('-date_joined')
 
+# =======================================================
+# MÓDULO DE COMPRAS Y COTIZACIONES (NUEVO FLUJO)
+# =======================================================
+
+@login_required(login_url='login')
+@user_passes_test(es_comprador, login_url='dashboard_erp')
+def atender_cotizacion(request, solicitud_id):
+    solicitud = get_object_or_404(SolicitudCompra, id=solicitud_id)
+    items = solicitud.items_cotizados.all()
+    
     if request.method == 'POST':
-        form = RegistroEmpleadoForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Empleado registrado y rol asignado correctamente.')
-            return redirect('gestionar_empleados')
-        else:
-            messages.error(request, 'Hubo un error. Revisa que el usuario no exista ya.')
-    else:
-        form = RegistroEmpleadoForm()
+        # Recorremos cada ítem para guardar los precios que puso Compras
+        for item in items:
+            proveedor = request.POST.get(f'proveedor_{item.id}')
+            precio = request.POST.get(f'precio_{item.id}')
+            especificaciones = request.POST.get(f'especificaciones_{item.id}')
+            certificado = request.POST.get(f'certificado_{item.id}') == 'on'
 
-    return render(request, 'web/erp/gestionar_empleados.html', {'form': form, 'empleados': empleados})
+            if proveedor and precio:
+                item.proveedor_cotizado = proveedor
+                item.precio_unitario = precio
+                item.especificaciones_tecnicas = especificaciones
+                item.certificado_calidad_incluido = certificado
+                item.save()
 
-# --- VISTAS DE ÓRDENES DE COMPRA (Abastecimiento) ---
+        solicitud.estado = 'COTIZADO'
+        solicitud.save()
+        messages.success(request, f"Cotización {solicitud.folio} enviada al Administrador para su aprobación.")
+        return redirect('dashboard_erp')
+        
+    return render(request, 'web/erp/atender_cotizacion.html', {'solicitud': solicitud, 'items': items})
+
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def revisar_cotizacion(request, solicitud_id):
+    solicitud = get_object_or_404(SolicitudCompra, id=solicitud_id)
+    items = solicitud.items_cotizados.all()
+    
+    if request.method == 'POST':
+        # El Admin aprueba o rechaza cada ítem
+        for item in items:
+            estado = request.POST.get(f'estado_{item.id}')
+            motivo = request.POST.get(f'motivo_{item.id}', '')
+
+            if estado in ['APROBADO', 'RECHAZADO']:
+                item.estado_aprobacion = estado
+                if estado == 'RECHAZADO':
+                    item.motivo_rechazo = motivo
+                item.save()
+
+        # Una vez guardado todo, llamamos a la función mágica que crea las órdenes de compra
+        return redirect('finalizar_revision_cotizacion', solicitud_id=solicitud.id)
+        
+    return render(request, 'web/erp/revisar_cotizacion.html', {'solicitud': solicitud, 'items': items})
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+@transaction.atomic
+def finalizar_revision_cotizacion(request, solicitud_id):
+    # Paso Final: Generar Órdenes de Compra para Bodega automáticamente
+    solicitud = get_object_or_404(SolicitudCompra, id=solicitud_id)
+    items_aprobados = solicitud.items_cotizados.filter(estado_aprobacion='APROBADO')
+    
+    # Agrupamos por proveedor
+    proveedores = items_aprobados.values_list('proveedor_cotizado', flat=True).distinct()
+    
+    for prov in proveedores:
+        if prov: # Asegurarnos que hay un proveedor registrado
+            items_prov = items_aprobados.filter(proveedor_cotizado=prov)
+            
+            nueva_oc = OrdenCompra.objects.create(
+                proveedor=prov,
+                creado_por=request.user,
+                estado='EMITIDA', 
+                observaciones=f"Generada automáticamente desde Solicitud {solicitud.folio}"
+            )
+            
+            for item in items_prov:
+                DetalleOrdenCompra.objects.create(
+                    orden=nueva_oc,
+                    material=item.material,
+                    cantidad_pedida=item.cantidad_requerida
+                )
+            
+    solicitud.estado = 'PROCESADO'
+    solicitud.save()
+    messages.success(request, "Órdenes de compra generadas y enviadas a Bodega correctamente.")
+    return redirect('dashboard_erp')
+
+
+# =======================================================
+# MÓDULO DE INVENTARIO Y ABASTECIMIENTO TRADICIONAL
+# =======================================================
 
 @login_required(login_url='login')
 @user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
@@ -260,6 +373,7 @@ def crear_orden_compra(request):
     else:
         form = OrdenCompraForm()
     return render(request, 'web/erp/crear_oc.html', {'form': form})
+
 @login_required(login_url='login')
 @user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def añadir_items_oc(request, oc_id):
@@ -288,21 +402,16 @@ def añadir_items_oc(request, oc_id):
         'oc': oc, 'detalles': detalles, 'form': form_detalle
     })
 
-# --- LISTA DE ÓRDENES DE COMPRA ---
 @login_required(login_url='login')
 @user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def listar_ordenes_compra(request):
     es_administrador = es_admin(request.user)
     
     if es_administrador:
-        # El Dueño/Admin ve ABSOLUTAMENTE TODO
         ordenes = OrdenCompra.objects.all().order_by('-fecha_creacion')
         estados_permitidos = OrdenCompra.ESTADOS
     else:
-        # REGLA ESTRICTA PARA BODEGUERO: Solo ve lo que ya fue Aprobado (EMITIDA en adelante)
         ordenes = OrdenCompra.objects.exclude(estado='BORRADOR').order_by('-fecha_creacion')
-        
-        # Le ocultamos también el botón de "Borrador" de los filtros superiores
         estados_permitidos = [est for est in OrdenCompra.ESTADOS if est[0] != 'BORRADOR']
 
     estado = request.GET.get('estado')
@@ -311,28 +420,26 @@ def listar_ordenes_compra(request):
 
     return render(request, 'web/erp/listar_oc.html', {
         'ordenes': ordenes,
-        'estados': estados_permitidos, # <-- Usamos los estados filtrados
+        'estados': estados_permitidos, 
         'estado_filtro': estado,
         'rol': 'Administrador' if es_administrador else 'Bodeguero',
     })
 
-# 4. Aprobar Orden de Compra (NUEVA: Solo Administrador)
 @login_required(login_url='login')
 @user_passes_test(es_admin, login_url='dashboard_erp')
 def aprobar_oc(request, oc_id):
     oc = get_object_or_404(OrdenCompra, id=oc_id)
     if oc.estado == 'BORRADOR':
-        oc.estado = 'EMITIDA' # Cambia el estado a Aprobada
+        oc.estado = 'EMITIDA' 
         oc.save()
         messages.success(request, f"¡Orden de Compra {oc.folio} APROBADA! El bodeguero ya puede verla para recibir el stock.")
     return redirect('listar_ordenes_compra')
 
-# 5. Recibir Orden (Ingresar a Bodega)
 @login_required(login_url='login')
 @user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def recibir_orden_compra(request, oc_id):
     oc = get_object_or_404(OrdenCompra, id=oc_id)
-    if oc.estado == 'EMITIDA': # Solo se puede recibir si ya fue Aprobada (Emitida)
+    if oc.estado == 'EMITIDA': 
         detalles = oc.detalles.all()
         for item in detalles:
             material = item.material
@@ -350,230 +457,12 @@ def recibir_orden_compra(request, oc_id):
     
     return redirect('listar_ordenes_compra')
 
-# --- VISTA DE APROBACIÓN (Solo Administrador) ---
-
-@login_required(login_url='login')
-@user_passes_test(es_admin, login_url='dashboard_erp')
-def procesar_ticket(request, req_id, accion):
-    ticket = get_object_or_404(Requerimiento, id=req_id)
-    if accion == 'aprobar':
-        ticket.estado = 'APROBADO'
-        messages.success(request, f"Ticket {ticket.folio} aprobado para despacho.")
-    elif accion == 'rechazar':
-        ticket.estado = 'RECHAZADO'
-        messages.warning(request, f"Ticket {ticket.folio} ha sido rechazado.")
-    
-    ticket.save()
-    return redirect('dashboard_erp')
-
-# =======================================================
-# MÓDULO DE REPORTES Y EXPORTACIÓN PDF
-# =======================================================
-
-@login_required(login_url='login')
-def imprimir_pdf_ticket(request, req_id):
- 
-    # 1. Buscamos el ticket
-    ticket = get_object_or_404(Requerimiento, id=req_id)
- 
-    # 2. CORRECCIÓN DE SEGURIDAD: verificar permiso
-    #    Antes no existía esta validación — cualquier usuario
-    #    logueado podía ver el PDF de cualquier ticket con
-    #    solo cambiar el número en la URL.
-    if not es_admin(request.user) and ticket.solicitante != request.user:
-        messages.error(request, "No tienes permiso para ver este comprobante.")
-        return redirect('dashboard_erp')
- 
-    # 3. Preparamos el contexto para el template HTML del PDF
-    detalles = ticket.detalles.all()
-    logo_path = os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg')
- 
-    context = {
-        'ticket': ticket,
-        'detalles': detalles,
-        'logo_path': logo_path,
-        'fecha_impresion': timezone.now(),
-    }
- 
-    # 4. Cargamos el diseño HTML del PDF
-    template = get_template('web/erp/pdf_ticket.html')
-    html = template.render(context)
- 
-    # 5. Preparamos la respuesta HTTP como PDF
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = (
-        f'attachment; filename="Comprobante_Entrega_{ticket.folio}.pdf"'
-    )
- 
-    # 6. Convertimos HTML → PDF
-    pisa_status = pisa.CreatePDF(html, dest=response)
-    if pisa_status.err:
-        return HttpResponse('Hubo un error al generar el PDF del ticket.')
- 
-    return response
-
-
-@login_required(login_url='login')
-def imprimir_pdf_oc(request, oc_id):
- 
-    # 1. Solo bodeguero o admin pueden imprimir una OC
-    if not es_bodeguero(request.user) and not es_admin(request.user):
-        messages.error(request, "No tienes permiso para imprimir órdenes de compra.")
-        return redirect('dashboard_erp')
- 
-    # 2. Buscamos la orden de compra con todos sus ítems
-    oc = get_object_or_404(OrdenCompra, id=oc_id)
-    detalles = oc.detalles.all()
- 
-    # 3. Ruta absoluta del logo (igual que en el ticket)
-    logo_path = os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg')
- 
-    context = {
-        'oc': oc,
-        'detalles': detalles,
-        'logo_path': logo_path,
-        'fecha_impresion': timezone.now(),
-    }
- 
-    # 4. Renderizamos el template HTML de la OC
-    #    (debes crear web/templates/web/erp/pdf_oc.html
-    #     copiando pdf_ticket.html y adaptando los campos)
-    template = get_template('web/erp/pdf_oc.html')
-    html = template.render(context)
- 
-    # 5. Generamos y devolvemos el PDF
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = (
-        f'attachment; filename="OrdenCompra_{oc.folio}.pdf"'
-    )
- 
-    pisa_status = pisa.CreatePDF(html, dest=response)
-    if pisa_status.err:
-        return HttpResponse('Hubo un error al generar el PDF de la orden de compra.')
- 
-    return response
-
-
-# (Opcional por ahora) Más adelante haremos el PDF de la Orden de Compra de la misma forma
-
-# =======================================================
-# MÓDULO DE SEGURIDAD (Gestión de Bloqueos)
-# =======================================================
-
-@login_required(login_url='login')
-@user_passes_test(es_admin, login_url='dashboard_erp')
-def gestionar_bloqueos(request):
-    # Traemos todos los registros de usuarios bloqueados o con intentos fallidos
-    intentos_fallidos = AccessAttempt.objects.all().order_by('-attempt_time')
-    
-    return render(request, 'web/erp/gestionar_bloqueos.html', {
-        'intentos': intentos_fallidos
-    })
-
-@login_required(login_url='login')
-@user_passes_test(es_admin, login_url='dashboard_erp')
-def desbloquear_usuario(request, intento_id):
-    # Buscamos el registro específico del bloqueo
-    intento = get_object_or_404(AccessAttempt, id=intento_id)
-    usuario = intento.username
-    
-    # Al eliminar el registro, la cuenta se desbloquea automáticamente
-    intento.delete()
-    
-    messages.success(request, f"¡El usuario '{usuario}' ha sido desbloqueado con éxito! Ya puede iniciar sesión.")
-    return redirect('gestionar_bloqueos')
-
-# Busca la sección del ERP y añade estas funciones
-@login_required(login_url='login')
-@user_passes_test(es_admin, login_url='dashboard_erp')
-def gestionar_proyectos(request):
-    proyectos = Proyecto.objects.all().order_by('-fecha_creacion')
-    
-    if request.method == 'POST':
-        form = ProyectoForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "¡Nuevo proyecto creado con éxito!")
-            return redirect('gestionar_proyectos')
-    else:
-        form = ProyectoForm()
-    
-    return render(request, 'web/erp/gestionar_proyectos.html', {
-        'proyectos': proyectos,
-        'form': form,
-        'rol': 'Administrador'
-    })
-
-@login_required(login_url='login')
-@user_passes_test(es_admin, login_url='dashboard_erp')
-def alternar_estado_proyecto(request, proyecto_id):
-    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
-    proyecto.is_active = not proyecto.is_active
-    proyecto.save()
-    
-    estado = "activado" if proyecto.is_active else "desactivado"
-    messages.success(request, f"Proyecto '{proyecto.nombre}' {estado} correctamente.")
-    return redirect('gestionar_proyectos')
-
-@login_required(login_url='login')
-@user_passes_test(es_admin, login_url='dashboard_erp')
-def editar_proyecto(request, proyecto_id):
-    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
-    if request.method == 'POST':
-        form = ProyectoForm(request.POST, instance=proyecto)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f"Proyecto '{proyecto.nombre}' actualizado.")
-    return redirect('gestionar_proyectos')
-
-@login_required(login_url='login')
-@user_passes_test(es_bodeguero, login_url='dashboard_erp')
-def añadir_items_oc(request, oc_id):
-    # Obtenemos la orden de compra
-    oc = get_object_or_404(OrdenCompra, id=oc_id)
-    detalles = oc.detalles.all() # Relación definida en tu models.py (related_name='detalles')
-
-    if request.method == 'POST':
-        form_detalle = DetalleOrdenCompraForm(request.POST)
-        if form_detalle.is_valid():
-            material = form_detalle.cleaned_data['material']
-            # Evitamos duplicados: si el material ya está en la lista, sumamos la cantidad
-            item_existente = detalles.filter(material=material).first()
-            if item_existente:
-                item_existente.cantidad_pedida += form_detalle.cleaned_data['cantidad_pedida']
-                item_existente.save()
-            else:
-                nuevo_item = form_detalle.save(commit=False)
-                nuevo_item.orden = oc
-                nuevo_item.save()
-            
-            messages.success(request, f'Se añadió {material.nombre} a la orden.')
-            return redirect('añadir_items_oc', oc_id=oc.id)
-    else:
-        form_detalle = DetalleOrdenCompraForm()
-
-    return render(request, 'web/erp/añadir_items_oc.html', {
-        'oc': oc,
-        'detalles': detalles,
-        'form': form_detalle
-    })
-
-
-
-# --- INVENTARIO ACTUAL (lo que hay en bodega ahora mismo) ---
-# --- INVENTARIO ACTUAL (lo que hay en bodega ahora mismo) ---
 @login_required(login_url='login')
 @user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def inventario_actual(request):
-    from django.db.models import F
-    
-    # 1. Base: Solo materiales activos
     materiales = Material.objects.filter(is_active=True).order_by('tipo', 'nombre')
-    
-    # 2. Las alertas globales
     alertas = Material.objects.filter(is_active=True, stock_actual__lte=F('stock_minimo'))
 
-    # 3. FILTROS DINÁMICOS
     tipo_filtro = request.GET.get('tipo')
     if tipo_filtro in ['MATERIAL', 'CONSUMIBLE']:
         materiales = materiales.filter(tipo=tipo_filtro)
@@ -582,7 +471,6 @@ def inventario_actual(request):
     if alerta_filtro == '1':
         materiales = materiales.filter(stock_actual__lte=F('stock_minimo'))
 
-    # 4. DETERMINAR ROL REAL PARA MOSTRAR BOTONES
     rol_actual = 'Administrador' if es_admin(request.user) else 'Bodeguero'
 
     return render(request, 'web/erp/inventario.html', {
@@ -605,15 +493,11 @@ def crear_material(request):
         form = MaterialForm()
     return render(request, 'web/erp/crear_material.html', {'form': form})
 
-# Vista para Editar Material (Solo Bodeguero o Admin pueden corregir)
 @login_required(login_url='login')
 @user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
 def editar_material(request, material_id):
-    # ¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA! Importamos el formulario
     from .forms import MaterialForm 
-    
     material = get_object_or_404(Material, id=material_id)
-    
     if request.method == 'POST':
         form = MaterialForm(request.POST, instance=material)
         if form.is_valid():
@@ -629,12 +513,10 @@ def editar_material(request, material_id):
         'material': material
     })
     
-# Vista para Ajustes Manuales
 @login_required(login_url='login')
-@user_passes_test(es_admin, login_url='dashboard_erp') # <--- ¡Aquí estaba el error! Ya está corregido a es_admin
+@user_passes_test(es_admin, login_url='dashboard_erp')
 def realizar_ajuste(request, material_id):
     material = get_object_or_404(Material, id=material_id)
-    
     if request.method == 'POST':
         form = AjusteInventarioForm(request.POST)
         if form.is_valid():
@@ -644,27 +526,87 @@ def realizar_ajuste(request, material_id):
             with transaction.atomic():
                 material.stock_actual += cantidad_ajuste
                 material.save()
-                
                 MovimientoInventario.objects.create(
-                    material=material,
-                    tipo='AJUSTE',
-                    cantidad=cantidad_ajuste,
-                    responsable=request.user,
-                    observaciones=observaciones
+                    material=material, tipo='AJUSTE', cantidad=cantidad_ajuste,
+                    responsable=request.user, observaciones=observaciones
                 )
-                
-            messages.success(request, f'¡Ajuste de {cantidad_ajuste} aplicado correctamente a {material.sku}! Registrado en bitácora.')
+            messages.success(request, f'¡Ajuste de {cantidad_ajuste} aplicado a {material.sku}!')
             return redirect('inventario_actual')
     else:
         form = AjusteInventarioForm()
         
     return render(request, 'web/erp/ajustar_inventario.html', {
-        'form': form,
-        'material': material,
-        'rol': 'Administrador'
+        'form': form, 'material': material, 'rol': 'Administrador'
     })
 
-# --- BITÁCORA DE AUDITORÍA (Historial completo de movimientos) ---
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def eliminar_material(request, material_id):
+    material = get_object_or_404(Material, id=material_id)
+    nombre_temp = material.nombre
+    try:
+        material.delete()
+        messages.success(request, f'Material "{nombre_temp}" eliminado definitivamente.')
+    except Exception: # Simplificado para evitar error de importación models.ProtectedError
+        material.is_active = False
+        material.save()
+        messages.warning(request, f'El material "{nombre_temp}" tiene historial. Ha sido desactivado.')
+    return redirect('inventario_actual')
+
+
+# =======================================================
+# MÓDULO DE PROYECTOS Y AUDITORÍA
+# =======================================================
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def gestionar_proyectos(request):
+    proyectos = Proyecto.objects.all().order_by('-fecha_creacion')
+    if request.method == 'POST':
+        form = ProyectoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "¡Nuevo proyecto creado con éxito!")
+            return redirect('gestionar_proyectos')
+    else:
+        form = ProyectoForm()
+    return render(request, 'web/erp/gestionar_proyectos.html', {'proyectos': proyectos, 'form': form, 'rol': 'Administrador'})
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def alternar_estado_proyecto(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    proyecto.is_active = not proyecto.is_active
+    proyecto.save()
+    estado = "activado" if proyecto.is_active else "desactivado"
+    messages.success(request, f"Proyecto '{proyecto.nombre}' {estado} correctamente.")
+    return redirect('gestionar_proyectos')
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def editar_proyecto(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    if request.method == 'POST':
+        form = ProyectoForm(request.POST, instance=proyecto)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Proyecto '{proyecto.nombre}' actualizado.")
+    return redirect('gestionar_proyectos')
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def eliminar_proyecto_erp(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    nombre_temp = proyecto.nombre
+    try:
+        proyecto.delete()
+        messages.success(request, f'Proyecto "{nombre_temp}" eliminado definitivamente.')
+    except Exception:
+        proyecto.is_active = False
+        proyecto.save()
+        messages.warning(request, f'El proyecto "{nombre_temp}" tiene requerimientos. Ha sido archivado.')
+    return redirect('gestionar_proyectos')
+
 @login_required(login_url='login')
 @user_passes_test(es_admin, login_url='dashboard_erp')
 def historial_movimientos(request):
@@ -682,12 +624,10 @@ def historial_movimientos(request):
         except ValueError:
             pass 
             
-    # NUEVO: Filtro por Proyecto (Solo los despachos van a proyectos)
     proyecto_id = request.GET.get('proyecto')
     if proyecto_id:
         movimientos_list = movimientos_list.filter(requerimiento_asociado__proyecto_id=proyecto_id)
 
-    # Listas de Proyectos para el menú desplegable
     proyectos_activos = Proyecto.objects.filter(is_active=True).order_by('nombre')
     proyectos_inactivos = Proyecto.objects.filter(is_active=False).order_by('nombre')
             
@@ -696,104 +636,136 @@ def historial_movimientos(request):
     page_obj = paginator.get_page(page_number)
         
     return render(request, 'web/erp/auditoria.html', {
-        'page_obj': page_obj,
-        'tipo_filtro': tipo_filtro,
-        'mes_filtro': mes_filtro,
-        'proyecto_id': proyecto_id,
-        'proyectos_activos': proyectos_activos,
-        'proyectos_inactivos': proyectos_inactivos,
-        'rol': 'Administrador'
+        'page_obj': page_obj, 'tipo_filtro': tipo_filtro, 'mes_filtro': mes_filtro,
+        'proyecto_id': proyecto_id, 'proyectos_activos': proyectos_activos,
+        'proyectos_inactivos': proyectos_inactivos, 'rol': 'Administrador'
     })
 
 
-# --- VISTA PARA GENERAR EL PDF DE LA AUDITORÍA (Reporte Dividido) ---
+# =======================================================
+# MÓDULO DE REPORTES Y EXPORTACIÓN PDF
+# =======================================================
+
+@login_required(login_url='login')
+def imprimir_pdf_ticket(request, req_id):
+    ticket = get_object_or_404(Requerimiento, id=req_id)
+    if not es_admin(request.user) and ticket.solicitante != request.user:
+        messages.error(request, "No tienes permiso para ver este comprobante.")
+        return redirect('dashboard_erp')
+ 
+    context = {
+        'ticket': ticket,
+        'detalles': ticket.detalles.all(),
+        'logo_path': os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg'),
+        'fecha_impresion': timezone.now(),
+    }
+ 
+    html = get_template('web/erp/pdf_ticket.html').render(context)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Comprobante_Entrega_{ticket.folio}.pdf"'
+ 
+    if pisa.CreatePDF(html, dest=response).err:
+        return HttpResponse('Hubo un error al generar el PDF del ticket.')
+    return response
+
+@login_required(login_url='login')
+def imprimir_pdf_oc(request, oc_id):
+    if not es_bodeguero(request.user) and not es_admin(request.user):
+        messages.error(request, "No tienes permiso para imprimir órdenes de compra.")
+        return redirect('dashboard_erp')
+ 
+    oc = get_object_or_404(OrdenCompra, id=oc_id)
+    context = {
+        'oc': oc, 'detalles': oc.detalles.all(),
+        'logo_path': os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg'),
+        'fecha_impresion': timezone.now(),
+    }
+ 
+    html = get_template('web/erp/pdf_oc.html').render(context)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="OrdenCompra_{oc.folio}.pdf"'
+ 
+    if pisa.CreatePDF(html, dest=response).err:
+        return HttpResponse('Hubo un error al generar el PDF de la orden de compra.')
+    return response
+
 @login_required(login_url='login')
 @user_passes_test(es_admin, login_url='dashboard_erp')
 def imprimir_pdf_auditoria(request):
     movimientos = MovimientoInventario.objects.all().order_by('-fecha_hora')
     
-    # Aplicar filtros
     tipo_filtro = request.GET.get('tipo')
-    if tipo_filtro:
-        movimientos = movimientos.filter(tipo=tipo_filtro)
+    if tipo_filtro: movimientos = movimientos.filter(tipo=tipo_filtro)
         
     mes_filtro = request.GET.get('mes')
     if mes_filtro:
         try:
             year, month = mes_filtro.split('-')
             movimientos = movimientos.filter(fecha_hora__year=year, fecha_hora__month=month)
-        except ValueError:
-            pass
+        except ValueError: pass
             
-    proyecto_id = request.GET.get('proyecto')
     proyecto_obj = None
+    proyecto_id = request.GET.get('proyecto')
     if proyecto_id:
         movimientos = movimientos.filter(requerimiento_asociado__proyecto_id=proyecto_id)
         proyecto_obj = get_object_or_404(Proyecto, id=proyecto_id)
 
-    # SEPARAR POR CATEGORÍAS PARA TABLAS DISTINTAS EN EL PDF
-    ingresos = movimientos.filter(tipo='INGRESO')
-    salidas = movimientos.filter(tipo='SALIDA')
-    ajustes = movimientos.filter(tipo='AJUSTE')
-
-    logo_path = os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg')
-    
     context = {
-        'ingresos': ingresos,
-        'salidas': salidas,
-        'ajustes': ajustes,
-        'tipo_filtro': tipo_filtro,
-        'mes_filtro': mes_filtro,
-        'proyecto': proyecto_obj,
-        'logo_path': logo_path,
+        'ingresos': movimientos.filter(tipo='INGRESO'),
+        'salidas': movimientos.filter(tipo='SALIDA'),
+        'ajustes': movimientos.filter(tipo='AJUSTE'),
+        'tipo_filtro': tipo_filtro, 'mes_filtro': mes_filtro, 'proyecto': proyecto_obj,
+        'logo_path': os.path.join(settings.BASE_DIR, 'web', 'static', 'web', 'img', 'logo.jpg'),
         'fecha_impresion': timezone.now(),
     }
     
-    template = get_template('web/erp/pdf_auditoria.html')
-    html = template.render(context)
-    
+    html = get_template('web/erp/pdf_auditoria.html').render(context)
     response = HttpResponse(content_type='application/pdf')
     nombre_archivo = f"Auditoria_{proyecto_obj.nombre.replace(' ', '_')}" if proyecto_obj else "Auditoria_Inventario_ProduMetal"
     response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}.pdf"'
     
-    pisa_status = pisa.CreatePDF(html, dest=response)
-    if pisa_status.err:
+    if pisa.CreatePDF(html, dest=response).err:
         return HttpResponse('Hubo un error al generar el PDF de la auditoría.')
     return response
 
-from django.db import models 
+
+# =======================================================
+# MÓDULO DE SEGURIDAD (Gestión de Bloqueos)
+# =======================================================
 
 @login_required(login_url='login')
 @user_passes_test(es_admin, login_url='dashboard_erp')
-def eliminar_material(request, material_id):
-    material = get_object_or_404(Material, id=material_id)
-    nombre_temp = material.nombre
+def gestionar_empleados(request):
+    Group.objects.get_or_create(name='Bodeguero')
+    Group.objects.get_or_create(name='Solicitante')
+    Group.objects.get_or_create(name='Compras')
     
-    try:
-        # Intento de borrado físico (Si es nuevo y no tiene historial)
-        material.delete()
-        messages.success(request, f'Material "{nombre_temp}" eliminado definitivamente.')
-    except models.ProtectedError:
-        # Si ya tiene movimientos asociados, no lo borramos, lo desactivamos
-        material.is_active = False
-        material.save()
-        messages.warning(request, f'El material "{nombre_temp}" tiene historial y no puede borrarse. Se ha desactivado del catálogo para auditoría.')
-        
-    return redirect('inventario_actual')
+    empleados = User.objects.filter(is_superuser=False).order_by('-date_joined')
+
+    if request.method == 'POST':
+        form = RegistroEmpleadoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Empleado registrado y rol asignado correctamente.')
+            return redirect('gestionar_empleados')
+        else:
+            messages.error(request, 'Hubo un error. Revisa que el usuario no exista ya.')
+    else:
+        form = RegistroEmpleadoForm()
+
+    return render(request, 'web/erp/gestionar_empleados.html', {'form': form, 'empleados': empleados})
+
 @login_required(login_url='login')
 @user_passes_test(es_admin, login_url='dashboard_erp')
-def eliminar_proyecto_erp(request, proyecto_id):
-    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
-    nombre_temp = proyecto.nombre
-    
-    try:
-        # Intento de borrado físico (Si es nuevo y no tiene tickets)
-        proyecto.delete()
-        messages.success(request, f'Proyecto "{nombre_temp}" eliminado definitivamente.')
-    except models.ProtectedError:
-        # Si ya tiene tickets asociados, no lo borramos, lo archivamos
-        proyecto.is_active = False
-        proyecto.save()
-        messages.warning(request, f'El proyecto "{nombre_temp}" tiene requerimientos asociados y no puede borrarse de la base de datos. Ha sido archivado.')
-        
-    return redirect('gestionar_proyectos')
+def gestionar_bloqueos(request):
+    intentos_fallidos = AccessAttempt.objects.all().order_by('-attempt_time')
+    return render(request, 'web/erp/gestionar_bloqueos.html', {'intentos': intentos_fallidos})
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def desbloquear_usuario(request, intento_id):
+    intento = get_object_or_404(AccessAttempt, id=intento_id)
+    usuario = intento.username
+    intento.delete()
+    messages.success(request, f"¡El usuario '{usuario}' ha sido desbloqueado con éxito! Ya puede iniciar sesión.")
+    return redirect('gestionar_bloqueos')

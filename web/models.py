@@ -169,3 +169,57 @@ class MovimientoInventario(models.Model):
 
     def __str__(self):
         return f"{self.tipo} - {self.cantidad} de {self.material.nombre} ({self.fecha_hora.strftime('%d/%m/%Y')})"
+    
+# Añadir al final de models.py
+
+# =====================================================================
+# MÓDULO DE COTIZACIONES Y COMPRAS (NUEVO FLUJO)
+# =====================================================================
+class SolicitudCompra(models.Model):
+    ESTADOS = [
+        ('ENVIADO_A_COMPRAS', 'Pendiente de Cotización (En Compras)'),
+        ('COTIZADO', 'Cotizado (Esperando Aprobación Admin)'),
+        ('PROCESADO', 'Procesado (Órdenes Generadas / Rechazados)'),
+    ]
+
+    folio = models.CharField(max_length=20, unique=True, blank=True, editable=False)
+    requerimiento_origen = models.ForeignKey(Requerimiento, on_delete=models.SET_NULL, null=True, blank=True, help_text="Ticket original del solicitante")
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    estado = models.CharField(max_length=30, choices=ESTADOS, default='ENVIADO_A_COMPRAS')
+    observaciones_admin = models.TextField(blank=True, help_text="Instrucciones del admin para compras")
+
+    def save(self, *args, **kwargs):
+        if not self.folio:
+            year = datetime.date.today().year
+            ultima_sol = SolicitudCompra.objects.filter(folio__startswith=f'SC-{year}').order_by('id').last()
+            secuencia = int(ultima_sol.folio.split('-')[-1]) + 1 if ultima_sol else 1
+            self.folio = f'SC-{year}-{secuencia:03d}'
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.folio} - {self.estado}"
+
+class CotizacionItem(models.Model):
+    ESTADOS_APROBACION = [
+        ('PENDIENTE', 'Pendiente de Revisión'),
+        ('APROBADO', 'Aprobado para Compra'),
+        ('RECHAZADO', 'Rechazado'),
+    ]
+
+    solicitud = models.ForeignKey(SolicitudCompra, related_name='items_cotizados', on_delete=models.CASCADE)
+    material = models.ForeignKey(Material, on_delete=models.PROTECT) # Puede ser un material nuevo creado o uno existente
+    cantidad_requerida = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # --- CAMPOS QUE LLENA EL DEPARTAMENTO DE COMPRAS ---
+    proveedor_cotizado = models.CharField(max_length=200, blank=True, null=True)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    especificaciones_tecnicas = models.TextField(blank=True, help_text="Norma del acero, espesores reales, etc.")
+    certificado_calidad_incluido = models.BooleanField(default=False, help_text="¿El proveedor entrega certificado de calidad (Ej. INEN, ASTM)?")
+    archivo_cotizacion = models.FileField(upload_to='cotizaciones/%Y/%m/', blank=True, null=True)
+    
+    # --- CAMPOS QUE LLENA EL ADMINISTRADOR AL REVISAR ---
+    estado_aprobacion = models.CharField(max_length=15, choices=ESTADOS_APROBACION, default='PENDIENTE')
+    motivo_rechazo = models.TextField(blank=True, help_text="Si se rechaza, explicar al solicitante por qué (Ej. Muy caro, cambiar diseño)")
+
+    def __str__(self):
+        return f"{self.material.nombre} - {self.estado_aprobacion}"

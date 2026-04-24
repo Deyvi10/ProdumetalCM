@@ -54,4 +54,11 @@ urlpatterns = [
     path('erp/inventario/auditoria/', views.historial_movimientos, name='historial_movimientos'),
     path('erp/inventario/auditoria/pdf/', views.imprimir_pdf_auditoria, name='imprimir_pdf_auditoria'),
     path('erp/inventario/eliminar/<int:material_id>/', views.eliminar_material, name='eliminar_material'),
+    
+  
+    # RUTAS DE COTIZACIONES Y COMPRAS
+
+    path('erp/cotizacion/atender/<int:solicitud_id>/', views.atender_cotizacion, name='atender_cotizacion'),
+    path('erp/cotizacion/revisar/<int:solicitud_id>/', views.revisar_cotizacion, name='revisar_cotizacion'),
+    path('erp/cotizacion/finalizar/<int:solicitud_id>/', views.finalizar_revision_cotizacion, name='finalizar_revision_cotizacion'),
 ]
