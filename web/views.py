@@ -435,27 +435,51 @@ def aprobar_oc(request, oc_id):
         messages.success(request, f"¡Orden de Compra {oc.folio} APROBADA! El bodeguero ya puede verla para recibir el stock.")
     return redirect('listar_ordenes_compra')
 
+# web/views.py
+
 @login_required(login_url='login')
-@user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
+@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+@transaction.atomic
 def recibir_orden_compra(request, oc_id):
     oc = get_object_or_404(OrdenCompra, id=oc_id)
-    if oc.estado == 'EMITIDA': 
-        detalles = oc.detalles.all()
+    detalles = oc.detalles.all()
+    
+    if request.method == 'POST':
+        # Procesamos el inventario y los archivos
         for item in detalles:
+            archivo_certificado = request.FILES.get(f'certificado_{item.id}')
+            
+            # 1. Actualizamos stock del material
             material = item.material
             material.stock_actual += item.cantidad_pedida
             material.save()
 
+            # 2. Creamos el registro de auditoría (Bitácora)
+            # Aquí se almacena el certificado nuevo sin borrar los viejos
             MovimientoInventario.objects.create(
-                material=material, tipo='INGRESO', cantidad=item.cantidad_pedida,
-                responsable=request.user, orden_compra_asociada=oc, certificado_calidad=oc.documento_respaldo
+                material=material,
+                tipo='INGRESO',
+                cantidad=item.cantidad_pedida,
+                responsable=request.user,
+                orden_compra_asociada=oc,
+                certificado_calidad=archivo_certificado # Se guarda el PDF del lote actual
             )
         
         oc.estado = 'RECIBIDA'
         oc.save()
-        messages.success(request, f"Orden {oc.folio} recibida. Stock actualizado correctamente.")
-    
-    return redirect('listar_ordenes_compra')
+        messages.success(request, f"Orden {oc.folio} recibida. Inventario actualizado y certificados almacenados.")
+        return redirect('listar_ordenes_compra')
+
+    return render(request, 'web/erp/recibir_stock_form.html', {'oc': oc, 'detalles': detalles})
+
+# RESTRICCIÓN TOTAL: Solo el Admin puede modificar registros de auditoría
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def editar_movimiento_auditoria(request, movimiento_id):
+    # Solo el admin puede corregir un certificado mal subido o una cantidad errónea
+    movimiento = get_object_or_404(MovimientoInventario, id=movimiento_id)
+    # ... lógica de edición ...
+    pass
 
 @login_required(login_url='login')
 @user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
@@ -480,7 +504,7 @@ def inventario_actual(request):
     })
 
 @login_required(login_url='login')
-@user_passes_test(es_bodeguero, login_url='dashboard_erp')
+@user_passes_test(es_admin, login_url='dashboard_erp')
 def crear_material(request):
     from .forms import MaterialForm
     if request.method == 'POST':
@@ -494,7 +518,7 @@ def crear_material(request):
     return render(request, 'web/erp/crear_material.html', {'form': form})
 
 @login_required(login_url='login')
-@user_passes_test(lambda u: es_bodeguero(u) or es_admin(u), login_url='dashboard_erp')
+@user_passes_test(es_admin, login_url='dashboard_erp')
 def editar_material(request, material_id):
     from .forms import MaterialForm 
     material = get_object_or_404(Material, id=material_id)
@@ -769,3 +793,38 @@ def desbloquear_usuario(request, intento_id):
     intento.delete()
     messages.success(request, f"¡El usuario '{usuario}' ha sido desbloqueado con éxito! Ya puede iniciar sesión.")
     return redirect('gestionar_bloqueos')
+
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def subir_certificado_lote(request, movimiento_id):
+    # Esta función permite al Administrador adjuntar un PDF de calidad 
+    # a un ingreso de bodega específico después de que el material ya llegó.
+    movimiento = get_object_or_404(MovimientoInventario, id=movimiento_id, tipo='INGRESO')
+    
+    if request.method == 'POST':
+        archivo_pdf = request.FILES.get('certificado_pdf')
+        if archivo_pdf:
+            movimiento.certificado_calidad = archivo_pdf
+            movimiento.save()
+            messages.success(request, f'Certificado de calidad adjuntado al lote de {movimiento.material.sku}.')
+        else:
+            messages.error(request, 'Debes seleccionar un archivo PDF.')
+            
+        return redirect('historial_movimientos')
+    
+@login_required(login_url='login')
+@user_passes_test(es_admin, login_url='dashboard_erp')
+def alternar_estado_empleado(request, empleado_id):
+    empleado = get_object_or_404(User, id=empleado_id)
+    
+    # Protección: El dueño no se puede bloquear a sí mismo por error
+    if empleado.is_superuser:
+        messages.error(request, "Por seguridad, no puedes suspender al Administrador principal.")
+        return redirect('gestionar_empleados')
+        
+    empleado.is_active = not empleado.is_active
+    empleado.save()
+    
+    estado = "restaurado" if empleado.is_active else "suspendido"
+    messages.success(request, f"El acceso del usuario '{empleado.username}' ha sido {estado} correctamente.")
+    return redirect('gestionar_empleados')

@@ -142,3 +142,17 @@ class AjusteInventarioForm(forms.Form):
         required=True, # ¡ESTO ES CLAVE! No pueden hacer un ajuste sin explicar por qué
         help_text="Explica detalladamente por qué se realiza este ajuste manual. Esta nota quedará en la auditoría inalterable."
     )
+
+# Añadir a web/forms.py
+
+class RecepcionMaterialForm(forms.Form):
+    # Este formulario se generará dinámicamente en la vista para cada ítem de la Orden
+    def __init__(self, *args, **kwargs):
+        detalles = kwargs.pop('detalles', [])
+        super().__init__(*args, **kwargs)
+        for item in detalles:
+            self.fields[f'certificado_{item.id}'] = forms.FileField(
+                label=f'Certificado para {item.material.nombre}',
+                required=False, # Puede que algún consumible no requiera certificado
+                widget=forms.ClearableFileInput(attrs={'class': 'form-control form-control-sm', 'accept': 'application/pdf'})
+            )

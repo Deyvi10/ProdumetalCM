@@ -169,7 +169,7 @@ class MovimientoInventario(models.Model):
 
     def __str__(self):
         return f"{self.tipo} - {self.cantidad} de {self.material.nombre} ({self.fecha_hora.strftime('%d/%m/%Y')})"
-    
+       
 # Añadir al final de models.py
 
 # =====================================================================

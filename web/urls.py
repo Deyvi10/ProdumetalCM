@@ -61,4 +61,5 @@ urlpatterns = [
     path('erp/cotizacion/atender/<int:solicitud_id>/', views.atender_cotizacion, name='atender_cotizacion'),
     path('erp/cotizacion/revisar/<int:solicitud_id>/', views.revisar_cotizacion, name='revisar_cotizacion'),
     path('erp/cotizacion/finalizar/<int:solicitud_id>/', views.finalizar_revision_cotizacion, name='finalizar_revision_cotizacion'),
+    path('erp/empleados/alternar/<int:empleado_id>/', views.alternar_estado_empleado, name='alternar_estado_empleado'),
 ]
